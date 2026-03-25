@@ -1,0 +1,8 @@
+        3,221 dict_reader.py
+     6,955,008 englishwords.db
+    63,201,294 en_GB-northern_english_male-medium.onnx
+        4,847 en_GB-northern_english_male-medium.onnx.json
+           305 MODEL_CARD
+<DIR>          recite
+        17,960 typing_game_pipertts.py
+        16,980 typing_game_pyttsx3.py
