@@ -165,13 +165,14 @@ class Game:
     @staticmethod
     def print_title():
         # print title
-        print(Color.BRIGHT_GREEN_FG + '='*35 + ' 猜数字 ' + '='*36 + Color.RESET_FG)
+        print(Color.BRIGHT_GREEN_FG + '='*35 + ' 猜颜色 ' + '='*36 + Color.RESET_FG)
 
     @staticmethod
     def print_control_tips():
         # print control tips
         print()
-        print('控制提示：')
+        print('游戏目标: 猜出颜色及排列顺序')
+        print('控制提示: ')
         print('1. 上下左右键移动光标')
         print('2. 空格/Z键设置颜色')
         print('3. 回车键确认猜测')
@@ -346,6 +347,7 @@ def main_loop():
                 game = Game(allow_same_color)
                 game.print_board()
             else:
+                game.stop_sound()
                 print("游戏结束。")
                 break
 
