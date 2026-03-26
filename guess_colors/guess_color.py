@@ -4,7 +4,8 @@ import msvcrt
 import os
 import time
 import sys
-
+import threading
+from playsound3 import playsound
 
 @dataclass
 class Color:
@@ -56,7 +57,43 @@ class Game:
 
         self.v_cursor_position = 0
         self.h_cursor_position = 0
+
+        self.is_stop_sound = False
+        self.bg_sound_thread = threading.Thread(target=self.play_background_sound)
+        self.bg_sound_thread.start()
     
+    def play_background_sound(self):
+            # loop the sound
+        sound_handle = playsound('sound/bg_sound.wav', block=False)
+        start_time = time.time()
+        while not self.is_stop_sound:
+            if time.time() - start_time >= 22:
+                # loop the sound
+                sound_handle.stop()
+                sound_handle = playsound('sound/bg_sound.wav', block=False)
+                start_time = time.time()
+            time.sleep(1)
+        sound_handle.stop()
+    
+    def stop_sound(self):
+        self.is_stop_sound = True
+    
+    def play_move_sound(self):
+        playsound('sound/move_effect.wav', block=False)
+    
+    def play_plug_sound(self):
+        playsound('sound/plug_effect.wav', block=False)
+    
+    def play_correct_effect(self, times=1):
+        for _ in range(times):
+            playsound('sound/correct_effect.wav', block=False)
+            time.sleep(0.2)
+    
+    def play_win_sound(self):
+        self.stop_sound()
+        playsound('sound/win_sound.wav', block=False)
+        self.play_background_sound()
+
     def _generate_color_sequence(self):
         color_list = []
         while len(color_list) < 4:
@@ -69,6 +106,7 @@ class Game:
     
     def set_current_guess(self, position, color):
         self.current_guess[position] = color
+        self.play_plug_sound()
     
     def get_current_guess(self):
         return self.current_guess
@@ -77,11 +115,13 @@ class Game:
         if None not in self.current_guess:
             self.guesses.append(self.current_guess.copy())
             result = self.compare(self.current_guess, self.colors)
+            self.play_correct_effect(result[0] + result[1])
             self.guess_results.append(result)
             self.current_guess = [None, None, None, None]
             self.v_cursor_position = 0
             if result[0] == 4: # All slots color right & position right
                 self.win = True
+                self.play_win_sound()
                 self.game_over = True
             elif len(self.guess_results) == 8: # All guess chance used, loss
                 self.win = False
@@ -108,15 +148,19 @@ class Game:
     
     def move_down(self):
         self.v_cursor_position = (self.v_cursor_position + 1) % 4
+        self.play_move_sound()
     
     def move_up(self):
         self.v_cursor_position = (self.v_cursor_position - 1) % 4
+        self.play_move_sound()
     
     def move_left(self):
         self.h_cursor_position = (self.h_cursor_position - 1) % 6
+        self.play_move_sound()
     
     def move_right(self):
         self.h_cursor_position = (self.h_cursor_position + 1) % 6
+        self.play_move_sound()
 
     @staticmethod
     def print_title():
@@ -280,6 +324,7 @@ def main_loop():
                     if game.game_over:
                         break
                 elif key in (b'Q', b'q', b'\x1b'):
+                    game.stop_sound()
                     sys.exit(0)
                 else:
                     key = None
@@ -297,6 +342,7 @@ def main_loop():
             if msvcrt.getch() in (b'y', b'Y', b'\r'):
                 # new round
                 clear()
+                game.stop_sound()
                 game = Game(allow_same_color)
                 game.print_board()
             else:
