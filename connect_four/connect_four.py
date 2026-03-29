@@ -30,6 +30,8 @@ class Color:
 
     RESET = '\033[0m'
 
+IS_WINDOWS = os.name == 'nt'
+
 class ConnectFour:
     def __init__(self):
         self.board = [[0 for _ in range(7)] for _ in range(6)]  # 6行7列
@@ -83,13 +85,29 @@ class ConnectFour:
     def play_win_sound(self):
         playsound('sound/win.wav', block=False)
 
-    def print_board(self):
+    def clear_screen(self):
         os.system('cls' if os.name == 'nt' else 'clear')
-        # 打印标题
+
+    def print_title(self):
         print('=' * 22 + '  四子棋游戏  ' + '=' * 21)
         print()
+    
+    def move_cursor(self, row: int, column: int):
+        """移动光标到指定位置"""
+        if IS_WINDOWS:
+            msvcrt.putch(b'\x1b')
+            msvcrt.putch(b'[')
+            for r in f"{row}":
+                msvcrt.putch(r.encode())
+            msvcrt.putch(b';')
+            for c in f"{column}":
+                msvcrt.putch(c.encode())
+            msvcrt.putch(b'H')
+        else:
+            curses.move(row, column)
 
-        # 打印棋子
+    def print_chess_row(self):
+        self.move_cursor(3, 0)
         for r in range(3):
             for i in range(1, 8):
                 if i == self.chess_position:
@@ -97,14 +115,16 @@ class ConnectFour:
                 else:
                     print(' ' * 8, end="")
             print()
-        
-        # 打印序号
+    
+    def print_lane_number(self):
+        self.move_cursor(6, 0)
         print(" ", end="")
         for i in range(1, 8):
             print(f'   {i}    ', end="")
         print()
-
-        # 打印棋盘, 
+    
+    def print_chess_board(self):
+        self.move_cursor(7, 0)
         print("+-------" * 7 + "+")
         for row in reversed(self.board):
             row_content = ''
@@ -122,6 +142,19 @@ class ConnectFour:
             print(row_content)
             print("+-------" * 7 + "+")
 
+    def print_board(self):
+        self.clear_screen()
+        # 打印标题
+        self.print_title()
+
+        # 打印棋子
+        self.print_chess_row()
+        
+        # 打印序号
+        self.print_lane_number()
+
+        # 打印棋盘
+        self.print_chess_board()
 
     def is_valid_move(self, col):
         return 0 <= col < 7 and self.board[5][col] == 0
@@ -352,6 +385,7 @@ class ConnectFour:
         self.game_mode = int(mode)
 
         if self.game_mode == 1:
+            print()
             print("棋子颜色:")
             print("1. 红色")
             print("2. 黄色")
@@ -364,7 +398,8 @@ class ConnectFour:
             player_color = int(color)
             self.ai_color = 2 if player_color == 1 else 1
 
-            print("\n玩家先手/后手:")
+            print()
+            print("玩家先手/后手:")
             print("1. 先手")
             print("2. 后手")
             turn = input("请选择先手/后手(1/2,直接[回车]默认1), [Q]退出游戏:")
@@ -380,25 +415,28 @@ class ConnectFour:
             self.init_player = self.current_player # keep this setting through all game rounds
 
         while True:
+            self.print_board()
             while not self.game_over:
-                self.print_board()
-
                 if self.game_mode == 2 or (self.game_mode == 1 and self.current_player != self.ai_color):
-                    print(f"{Color.RED_FG + '红方' + Color.RESET if self.current_player == 1 else Color.YELLOW_FG + '黄方' + Color.RESET}玩家请下棋")
-                    print("请用[左][右]移动棋子,[下]/[空格]落子")
-                    print("或输入列号(1-7)直接落子")
-                    print("[Q]退出")
+                    self.move_cursor(32, 0)
+                    print(f"{Color.RED_FG + '红方' + Color.RESET if self.current_player == 1 else Color.YELLOW_FG + '黄方' + Color.RESET}玩家请下棋:" + ' ' * 30)
+                    print(f"请用[左][右]移动棋子,[下]/[空格]落子" + ' ' * 30)
+                    print(f"或输入列号(1-7)直接落子" + ' ' * 30)
+                    print(f"[Q]退出" + ' ' * 30)
+                    print(f" " * 30)
                     move = self.get_user_input()
                     if move.lower() == 'q':
-                        print("游戏已退出")
+                        print(f"游戏已退出!" + ' ' * 30)
                         return
-                    if move == 'left' and self.chess_position > 1:
-                        self.chess_position -= 1
-                        self.play_move_sound()
-                        continue
-                    elif move == 'right' and self.chess_position < 7:
-                        self.chess_position += 1
-                        self.play_move_sound()
+                    if move in ('left', 'right'):
+                        if move == 'left' and self.chess_position > 1:
+                            self.chess_position -= 1
+                            self.play_move_sound()
+                            self.print_chess_row()
+                        elif move == 'right' and self.chess_position < 7:
+                            self.chess_position += 1
+                            self.play_move_sound()
+                            self.print_chess_row()
                         continue
                     elif move == 'down':
                         move = self.chess_position
@@ -406,18 +444,26 @@ class ConnectFour:
                     try:
                         col = int(move) - 1
                         if not self.is_valid_move(col):
-                            print("无效的移动，请重新输入")
+                            print(f"无效的移动，请重新输入!" + ' ' * 30)
                             continue
                     except ValueError:
-                        print("请输入有效的列号")
+                        print(f"请输入有效的列号!" + ' ' * 30)
                         continue
                 else:
-                    print("AI正在思考...")
+                    self.move_cursor(32, 0)
+                    print(f"{Color.BLUE_FG + 'AI' + Color.RESET}正在思考..." + ' ' * 30)
                     col = self.get_ai_move()
-                    print(f"AI选择了列 {col + 1}")
+                    print(f"AI选择了列 {col + 1}" + ' ' * 30)
+                    print(f" " * 30)
+                    print(f" " * 30)
+                    print(f" " * 30)
+                    print(f" " * 30)
+                    print(f" " * 30)
 
                 row, col = self.drop_piece(col, self.current_player)
                 self.play_drop_sound()
+                self.print_chess_board()
+
                 if self.check_win(self.current_player, row, col):
                     self.game_over = True
                     self.play_win_sound()
