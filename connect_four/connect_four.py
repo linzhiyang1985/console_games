@@ -9,25 +9,9 @@ from playsound3 import playsound
 
 @dataclass
 class Color:
-    BLACK_FG = '\033[30m'
     RED_FG = '\033[31m'
-    GREEN_FG = '\033[32m'
     YELLOW_FG = '\033[33m'
     BLUE_FG = '\033[34m'
-    MAGENTA_FG = '\033[35m'
-    CYAN_FG = '\033[36m'
-    DARK_WHITE_FG = '\033[37m'
-    DARK_WHITE_BG = '\033[47m'
-
-    BRIGHT_BLACK_FG = '\033[90m'
-    BRIGHT_RED_FG = '\033[91m'
-    BRIGHT_GREEN_FG = '\033[92m'
-    BRIGHT_YELLOW_FG = '\033[93m'
-    BRIGHT_BLUE_FG = '\033[94m'
-    BRIGHT_MAGENTA_FG = '\033[95m'
-    BRIGHT_CYAN_FG = '\033[96m'
-    WHITE_FG = '\033[97m'
-
     RESET = '\033[0m'
 
 IS_WINDOWS = os.name == 'nt'
@@ -47,22 +31,6 @@ class ConnectFour:
         self.board = [[0 for _ in range(7)] for _ in range(6)]  # 6行7列
         self.game_over = False
         self.current_player = self.init_player
-
-    # def print_board(self):
-    #     os.system('cls' if os.name == 'nt' else 'clear')
-    #     print(" 1 2 3 4 5 6 7")
-    #     print("-+-+-+-+-+-+-+-")
-    #     for row in reversed(self.board):
-    #         print("|", end="")
-    #         for cell in row:
-    #             if cell == 1:
-    #                 print(Color.RED_FG + "R" + Color.RESET, end="|")  # 红色
-    #             elif cell == 2:
-    #                 print(Color.YELLOW_FG + "Y" + Color.RESET, end="|")  # 黄色
-    #             else:
-    #                 print(Color.DARK_WHITE_BG + " " + Color.RESET, end="|")
-    #         print()
-    #     print("-+-+-+-+-+-+-+-")
 
     CHESS = ('▗▟█▙▖', '█████', '▝▜█▛▘')
 
