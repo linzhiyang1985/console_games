@@ -4,13 +4,16 @@ import random
 from dataclasses import dataclass
 import msvcrt
 import time
+import threading
 from playsound3 import playsound
 
 
 @dataclass
 class Color:
     RED_FG = '\033[31m'
+    BRIGHT_RED_FG = '\033[91m'
     YELLOW_FG = '\033[33m'
+    BRIGHT_YELLOW_FG = '\033[93m'
     BLUE_FG = '\033[34m'
     RESET = '\033[0m'
 
@@ -21,16 +24,44 @@ class ConnectFour:
         self.board = [[0 for _ in range(7)] for _ in range(6)]  # 6行7列
         self.init_player = 1
         self.game_over = False
+        self.win_four_positions = []
         self.current_player = 1  # 1代表红色，2代表黄色
         self.game_mode = None  # 1: 双人对战, 2: 人机对战
         self.ai_color = None  # AI的颜色
         self.ai_difficulty = random.randint(1, 3)  # AI难度，1-3
         self.chess_position = 4
+
+        self.is_stop_sound = False
+        self.bg_sound_thread = None
+    
+    def play_background_sound(self):
+            # loop the sound
+        sound_handle = playsound('sound/background.wav', block=False)
+        start_time = time.time()
+        while not self.is_stop_sound:
+            if time.time() - start_time >= 35:
+                # loop the sound
+                sound_handle.stop()
+                sound_handle = playsound('sound/background.wav', block=False)
+                start_time = time.time()
+            time.sleep(1)
+        sound_handle.stop()
+    
+    def stop_sound(self):
+        self.is_stop_sound = True
     
     def renew_game(self):
         self.board = [[0 for _ in range(7)] for _ in range(6)]  # 6行7列
+        self.win_four_positions.clear()
         self.game_over = False
         self.current_player = self.init_player
+        self.ai_difficulty = random.randint(1, 3)  # AI难度，1-3
+        
+        self.stop_sound()
+        self.bg_sound_thread.join()
+        self.is_stop_sound = False
+        self.bg_sound_thread = threading.Thread(target=self.play_background_sound)
+        self.bg_sound_thread.start()
 
     CHESS = ('▗▟█▙▖', '█████', '▝▜█▛▘')
 
@@ -51,6 +82,7 @@ class ConnectFour:
         time.sleep(0.2)
 
     def play_win_sound(self):
+        self.stop_sound()
         playsound('sound/win.wav', block=False)
 
     def clear_screen(self):
@@ -94,15 +126,19 @@ class ConnectFour:
     def print_chess_board(self):
         self.move_cursor(7, 0)
         print("+-------" * 7 + "+")
-        for row in reversed(self.board):
+        for r_idx, row in enumerate(reversed(self.board)):
             row_content = ''
             for i in range(3):
                 row_content += "|"
-                for cell in row:
+                for c_idx, cell in enumerate(row):
+                    if (5 - r_idx, c_idx) in self.win_four_positions:
+                        highlight = True and self.game_over # only show highlight when this round completed
+                    else:
+                        highlight = False
                     if cell == 1:
-                        row_content += Color.RED_FG + ' ' + self.CHESS[i] + ' ' + Color.RESET + "|"
+                        row_content += (Color.BRIGHT_RED_FG if highlight else Color.RED_FG) + ' ' + self.CHESS[i] + ' ' + Color.RESET + "|"
                     elif cell == 2:
-                        row_content += Color.YELLOW_FG + ' ' + self.CHESS[i] + ' ' + Color.RESET + "|"
+                        row_content += (Color.BRIGHT_YELLOW_FG if highlight else Color.YELLOW_FG) + ' ' + self.CHESS[i] + ' ' + Color.RESET + "|"
                     else:
                         row_content += " " * 7 + "|"
                 if i < 2:
@@ -137,76 +173,101 @@ class ConnectFour:
     def check_win(self, player, row, col):
         # 检查横向
         count = 0
+        self.win_four_positions.clear()
         for c in range(7):
             if self.board[row][c] == player:
                 count += 1
+                self.win_four_positions.append((row, c))
                 if count == 4:
+                    self.win_four_positions = self.win_four_positions[-4:]
                     return True
             else:
                 count = 0
+                self.win_four_positions.clear()
 
         # 检查纵向
         count = 0
+        self.win_four_positions.clear()
         for r in range(6):
             if self.board[r][col] == player:
                 count += 1
+                self.win_four_positions.append((r, col))
                 if count == 4:
+                    self.win_four_positions = self.win_four_positions[-4:]
                     return True
             else:
                 count = 0
+                self.win_four_positions.clear()
 
         # 检查对角线（右上）
         count = 0
+        self.win_four_positions.clear()
         r, c = row, col
         while r >= 0 and c < 7:
             if self.board[r][c] == player:
                 count += 1
+                self.win_four_positions.append((r, c))
                 if count == 4:
+                    self.win_four_positions = self.win_four_positions[-4:]
                     return True
             else:
                 count = 0
+                self.win_four_positions.clear()
             r -= 1
             c += 1
 
         # 检查对角线（左上）
         count = 0
+        self.win_four_positions.clear()
         r, c = row, col
         while r >= 0 and c >= 0:
             if self.board[r][c] == player:
                 count += 1
+                self.win_four_positions.append((r, c))
                 if count == 4:
+                    self.win_four_positions = self.win_four_positions[-4:]
                     return True
             else:
                 count = 0
+                self.win_four_positions.clear()
             r -= 1
             c -= 1
 
         # 检查对角线（左下）
         count = 0
+        self.win_four_positions.clear()
         r, c = row, col
         while r < 6 and c >= 0:
             if self.board[r][c] == player:
                 count += 1
+                self.win_four_positions.append((r, c))
                 if count == 4:
+                    self.win_four_positions = self.win_four_positions[-4:]
                     return True
             else:
                 count = 0
+                self.win_four_positions.clear()
             r += 1
             c -= 1
 
         # 检查对角线（右下）
         count = 0
+        self.win_four_positions.clear()
         r, c = row, col
         while r < 6 and c < 7:
             if self.board[r][c] == player:
                 count += 1
+                self.win_four_positions.append((r, c))
                 if count == 4:
+                    self.win_four_positions = self.win_four_positions[-4:]
                     return True
             else:
                 count = 0
+                self.win_four_positions.clear()
             r += 1
             c += 1
 
+        self.win_four_positions.clear()
         return False
 
     def is_board_full(self):
@@ -381,6 +442,9 @@ class ConnectFour:
             else:
                 self.current_player = player_color
             self.init_player = self.current_player # keep this setting through all game rounds
+        
+        self.bg_sound_thread = threading.Thread(target=self.play_background_sound)
+        self.bg_sound_thread.start()
 
         while True:
             self.print_board()
@@ -457,4 +521,9 @@ class ConnectFour:
 
 if __name__ == "__main__":
     game = ConnectFour()
-    game.play()
+    try:
+        game.play()
+    except:
+        pass
+    finally:
+        game.stop_sound()
