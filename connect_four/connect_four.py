@@ -179,7 +179,6 @@ class ConnectFour:
                 count += 1
                 self.win_four_positions.append((row, c))
                 if count == 4:
-                    self.win_four_positions = self.win_four_positions[-4:]
                     return True
             else:
                 count = 0
@@ -193,79 +192,68 @@ class ConnectFour:
                 count += 1
                 self.win_four_positions.append((r, col))
                 if count == 4:
-                    self.win_four_positions = self.win_four_positions[-4:]
                     return True
             else:
                 count = 0
                 self.win_four_positions.clear()
 
-        # 检查对角线（右上）
+        # 同时检查对角线（右上） + (左下)
         count = 0
         self.win_four_positions.clear()
-        r, c = row, col
-        while r >= 0 and c < 7:
-            if self.board[r][c] == player:
+        r_up, c_up = row, col
+        while r_up >= 0 and c_up < 7:
+            if self.board[r_up][c_up] == player:
                 count += 1
-                self.win_four_positions.append((r, c))
+                self.win_four_positions.append((r_up, c_up))
                 if count == 4:
-                    self.win_four_positions = self.win_four_positions[-4:]
                     return True
             else:
-                count = 0
-                self.win_four_positions.clear()
-            r -= 1
-            c += 1
+                break
+            r_up -= 1
+            c_up += 1
+        
+        # 避免下棋位置重复计算, 从下棋位置的下一个位置开始检查
+        r_down, c_down = row+1, col-1
+        while r_down < 6 and c_down >= 0:
+            if self.board[r_down][c_down] == player:
+                count += 1 # 首次循环, 下棋位置再次被加进来
+                self.win_four_positions.append((r_down, c_down))
+                if count >= 4:
+                    return True
+            else:
+                break
+            r_down += 1
+            c_down -= 1
+        
+        # 未能return说明斜向两头一起检查仍然不够4个棋子
+        # 继续检查另一斜边之前要重置
+        count = 0
+        self.win_four_positions.clear()
+        # 同时检查对角线（左上）+(右下)
+        r_up, c_up = row, col
+        while r_up >= 0 and c_up >= 0:
+            if self.board[r_up][c_up] == player:
+                count += 1
+                self.win_four_positions.append((r_up, c_up))
+                if count == 4:
+                    return True
+            else:
+                break
+            r_up -= 1
+            c_up -= 1
 
-        # 检查对角线（左上）
-        count = 0
-        self.win_four_positions.clear()
-        r, c = row, col
-        while r >= 0 and c >= 0:
-            if self.board[r][c] == player:
-                count += 1
-                self.win_four_positions.append((r, c))
-                if count == 4:
-                    self.win_four_positions = self.win_four_positions[-4:]
+        # 避免下棋位置重复计算, 从下棋位置的下一个位置开始检查
+        r_down, c_down = row+1, col+1
+        while r_down < 6 and c_down < 7:
+            if self.board[r_down][c_down] == player:
+                count += 1 # 首次循环, 下棋位置再次被加进来
+                self.win_four_positions.append((r_down, c_down))
+                if count >= 4:
                     return True
             else:
-                count = 0
-                self.win_four_positions.clear()
-            r -= 1
-            c -= 1
-
-        # 检查对角线（左下）
-        count = 0
-        self.win_four_positions.clear()
-        r, c = row, col
-        while r < 6 and c >= 0:
-            if self.board[r][c] == player:
-                count += 1
-                self.win_four_positions.append((r, c))
-                if count == 4:
-                    self.win_four_positions = self.win_four_positions[-4:]
-                    return True
-            else:
-                count = 0
-                self.win_four_positions.clear()
-            r += 1
-            c -= 1
-
-        # 检查对角线（右下）
-        count = 0
-        self.win_four_positions.clear()
-        r, c = row, col
-        while r < 6 and c < 7:
-            if self.board[r][c] == player:
-                count += 1
-                self.win_four_positions.append((r, c))
-                if count == 4:
-                    self.win_four_positions = self.win_four_positions[-4:]
-                    return True
-            else:
-                count = 0
-                self.win_four_positions.clear()
-            r += 1
-            c += 1
+                break
+            r_down += 1
+            c_down += 1
 
         self.win_four_positions.clear()
         return False
@@ -472,7 +460,7 @@ class ConnectFour:
                         continue
                     elif move == 'down':
                         move = self.chess_position
-                    # do move
+                    # check move
                     try:
                         col = int(move) - 1
                         if not self.is_valid_move(col):
@@ -491,7 +479,7 @@ class ConnectFour:
                     print(f" " * 30)
                     print(f" " * 30)
                     print(f" " * 30)
-
+                # do move
                 row, col = self.drop_piece(col, self.current_player)
                 self.play_drop_sound()
                 self.print_chess_board()
@@ -509,7 +497,9 @@ class ConnectFour:
                     print("平局！")
                     break
 
+                # switch player
                 self.current_player = 2 if self.current_player == 1 else 1
+                self.print_chess_row()
 
             again = input("再玩一局(Y/N, 直接[回车]再玩一局)? ").lower()
             if again.strip() == "":
