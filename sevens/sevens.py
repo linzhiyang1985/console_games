@@ -324,13 +324,7 @@ class Game:
         # 发牌
         self.deal_cards()
         
-        # # 开局出所有的7
-        # print("\n=== 开局出7 ===")
-        # for player in self.players:
-        #     player.play_sevens(self.table)
-        
         # 显示初始桌面
-        # self.show_table()
         self.draw_table()
         
         # 游戏主循环
@@ -360,7 +354,7 @@ class Game:
                     self.table[card.suit].sort(key=lambda x: x.get_value())
                 else:
                     # 检查是否已超过最大过牌次数
-                    if player.passes > player.max_passes:
+                    if player.passes > player.max_passes: # 最后这次+1其实不生效, 玩家已经没资格跳过
                         player.is_out = True
                         print(f"\n{player.name} 无法跳过此轮出牌, 出局!")
                         continue
@@ -380,19 +374,9 @@ class Game:
 
         print("\n=== 游戏结束 ===")
         for player in self.players:
-            print(f"{player.name:<3}: 剩下{len(player.hand)}张牌, 过牌{player.passes}次")
+            print(f"{player.name:<3}: 剩下{len(player.hand)}张牌, 过牌{min(3, player.passes)}次" + ('(已出局)' if player.is_out else ''))
             print(f"{player.name:<3}手牌: {', '.join([str(card) for card in player.hand])}")
-    
-    # def show_table(self):
-    #     print("\n=== Table ===")
-    #     for suit, cards in self.table.items():
-    #         if cards:
-    #             min_rank = min([card.get_value() for card in cards])
-    #             max_rank = max([card.get_value() for card in cards])
-    #             print(f"{suit}: {self.get_rank_str(min_rank)}-{self.get_rank_str(max_rank)}")
-    #         else:
-    #             print(f"{suit}: Empty")
-    
+        
     def draw_table(self):
         for suit in SUITS:
             self.show_dot_matrix(self.table[suit])
@@ -444,14 +428,10 @@ class Game:
 
 
 if __name__ == "__main__":
-    game = Game()
-    game.start_game()
-
-    # r = [RANKS[11:], RANKS[10:], RANKS[9:], RANKS[8:]]
-    # for i, suit in enumerate(SUITS):
-    #     game.table[suit] = []
-    #     for rank in r[i]:
-    #         game.table[suit].append(Card(suit, rank))
-
-    # for suit in SUITS:
-    #     game.show_dot_matrix(game.table[suit])
+    while True:
+        game = Game()
+        game.start_game()
+        
+        response = input("再来一局? (y,[回车]/n)")
+        if not response.lower().startswith('y') and not response.strip() == '':
+            break
