@@ -124,9 +124,7 @@ class Player:
             return None
         
         if self.is_human:
-            # 人类玩家选择出牌
-            # print("\n".join(self.get_hand_option_str()))
-            
+            # 人类玩家选择出牌            
             while True:
                 try:
                     choice = input("请输入出牌的序号, 或0/p跳过此轮, 或q退出游戏: ")
@@ -292,17 +290,6 @@ class Player:
                     break
         
         return score
-    
-    # def play_sevens(self, table):
-    #     # 开局出所有的7
-    #     sevens = [card for card in self.hand if card.rank == '7']
-    #     for seven in sevens:
-    #         self.hand.remove(seven)
-    #         if seven.suit not in table:
-    #             table[seven.suit] = []
-    #         table[seven.suit].append(seven)
-    #         print(f"{self.name:<3} 出牌 {seven}")
-    #     return sevens
 
 class Game:
     def __init__(self):
@@ -338,10 +325,7 @@ class Game:
         
         # 发牌
         self.deal_cards()
-        
-        # # 显示初始桌面
-        # self.draw_table()
-        
+                
         # 游戏主循环
         game_over = False
         while not game_over:
@@ -385,9 +369,6 @@ class Game:
                     game_over = True
                     break
 
-                # # 显示桌面
-                # self.draw_table()
-
             if all(player.is_out for player in self.players):
                 print("\n=== 所有玩家都出局, 游戏结束。 ===")
                 game_over = True
@@ -407,24 +388,11 @@ class Game:
             else:
                 print()
 
-
     def show_status(self):
         print("\n=== 玩家状态 ===")
         for player in self.players:
             print(f"{player.name:<3}: 剩余{len(player.hand)}张牌, 剩余过牌{max(0,player.max_passes - player.passes)}次" + ('(已出局)' if player.is_out else ''))
     
-    def get_rank_str(self, value):
-        if value == 1:
-            return 'A'
-        elif value == 11:
-            return 'J'
-        elif value == 12:
-            return 'Q'
-        elif value == 13:
-            return 'K'
-        else:
-            return str(value)
-
     def render_card(self, card):
         rendered_str = ''
         char_color = RED if ('♥' in card or '♦' in card) else BLUE
