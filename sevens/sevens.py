@@ -1,10 +1,15 @@
 import random
 import sys
+import re
+import os
+
+CHINESE_CHAR_PATTERN = re.compile(r'[\u4e00-\u9fa5]{1}')  # 中文字符的Unicode范围
 
 # 牌的定义
 SUITS = ['♠', '♥', '♣', '♦']
 RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
 
+DISPLAY_RANKS = ['𝐀', '𝟮', '𝟯', '𝟰', '𝟱', '𝟲', '𝟳', '𝟴', '𝟵', '𝟭𝟬', '𝐉', '𝐐', '𝐊']
 
 BLUE = "\033[94m"
 YELLOW = "\033[93m"
@@ -31,7 +36,7 @@ class Card:
     
     def __str__(self):
         card_color = RED if self.suit in ('♥', '♦') else BLUE
-        return f"{card_color}{self.suit}{self.rank}{RESET}"
+        return f"{card_color}{self.suit}{RESET}{DISPLAY_RANKS[RANKS.index(self.rank)]}"
     
     def get_value(self):
         if self.rank == 'A':
@@ -46,10 +51,10 @@ class Card:
             return
         ## 只生成一次
         if len(self.rank) == 1:
-            rank_left = self.rank + ' '
-            rank_right = ' ' + self.rank
+            rank_left = DISPLAY_RANKS[RANKS.index(self.rank)] + ' '
+            rank_right = ' ' + DISPLAY_RANKS[RANKS.index(self.rank)]
         else:
-            rank_left = rank_right = self.rank
+            rank_left = rank_right = DISPLAY_RANKS[RANKS.index(self.rank)]
         suit_center = ' ' + self.suit + ' '
         
         card = []
@@ -106,6 +111,13 @@ class Player:
         # 如果没有任何牌在桌上，只能出7
         return card.rank == '7'
     
+    def get_hand_option_str(self):
+        hand_strs = [f'{self.name}的牌:']
+        hand_strs.append('0. 不出,过')
+        for i, card in enumerate(self.hand):
+            hand_strs.append(f"{i+1}. {card}")
+        return hand_strs
+    
     def play_card(self, table):
         if not self.has_playable_card(table):
             self.passes += 1
@@ -113,10 +125,7 @@ class Player:
         
         if self.is_human:
             # 人类玩家选择出牌
-            print(f"\n{self.name}的牌:")
-            print("0. 不出, 过")
-            for i, card in enumerate(self.hand):
-                print(f"{i+1}. {card}")
+            # print("\n".join(self.get_hand_option_str()))
             
             while True:
                 try:
@@ -304,6 +313,9 @@ class Game:
             Player("电脑2"),
             Player("电脑3")
         ]
+
+        random.shuffle(self.players) # 随机选一个玩家开始
+
         self.table = {suit: [] for suit in SUITS}
     
     def deal_cards(self):
@@ -317,15 +329,18 @@ class Game:
                     # 继续发牌，直到不是7
                     card = self.deck.deal()[0]
                 player.add_cards([card])
-    
+
+    def clear(self):
+        os.system('cls')
+
     def start_game(self):
         print("=== 排七游戏开始 ===")
         
         # 发牌
         self.deal_cards()
         
-        # 显示初始桌面
-        self.draw_table()
+        # # 显示初始桌面
+        # self.draw_table()
         
         # 游戏主循环
         game_over = False
@@ -333,16 +348,15 @@ class Game:
             for player in self.players:
                 if player.is_out:
                     continue
-                # 检查是否已出完牌
-                if not player.hand:
-                    print(f"\n{player.name}赢了!")
-                    game_over = True
-                    break
                                 
                 print(f"\n=== 轮到{player.name}出牌 ===")
                 print(f"剩余过牌次数: {player.max_passes - player.passes}")
                 
                 # 玩家出牌
+                if player.is_human:
+                    hand_options = player.get_hand_option_str()
+                    self.draw_table(padding_texts=hand_options)
+
                 card = player.play_card(self.table)
                 if card:
                     print(f"{player.name:<3} 出牌 {card}")
@@ -361,12 +375,18 @@ class Game:
                     else:
                         print(f"{player.name:<3} 跳过此轮出牌")
                 
-                # 显示桌面
-                # self.show_table()
-                self.draw_table()
+                if player.is_human:
+                    # 显示各玩家剩余牌数和过牌次数
+                    self.show_status()
                 
-                # 显示各玩家剩余牌数和过牌次数
-                self.show_status()
+                # 检查是否已出完牌
+                if not player.hand:
+                    print(f"\n{RED}❉⊱•❉⊱• {player.name}赢了! •⊰❉•⊰❉{RESET}")
+                    game_over = True
+                    break
+
+                # # 显示桌面
+                # self.draw_table()
 
             if all(player.is_out for player in self.players):
                 print("\n=== 所有玩家都出局, 游戏结束。 ===")
@@ -376,10 +396,17 @@ class Game:
         for player in self.players:
             print(f"{player.name:<3}: 剩下{len(player.hand)}张牌, 过牌{min(3, player.passes)}次" + ('(已出局)' if player.is_out else ''))
             print(f"{player.name:<3}手牌: {', '.join([str(card) for card in player.hand])}")
+        # 最后显示桌面
+        self.draw_table()
         
-    def draw_table(self):
+    def draw_table(self, padding_texts=[]):
         for suit in SUITS:
-            self.show_dot_matrix(self.table[suit])
+            self.show_dot_matrix(self.table[suit], padding_texts)
+            if padding_texts:
+                print(padding_texts.pop(0))
+            else:
+                print()
+
 
     def show_status(self):
         print("\n=== 玩家状态 ===")
@@ -412,19 +439,32 @@ class Game:
                 rendered_str += ch
         return rendered_str
 
-    def show_dot_matrix(self, cards):
-        smallest_cards = min(cards, key=lambda x: x.get_value())
+    def show_dot_matrix(self, cards, padding_texts=[], padding_align=10):
+        smallest_cards = min(cards, key=lambda x: x.get_value())        
         padding_card_spaces = ''
         for _ in range(smallest_cards.get_value() - 1):
             padding_card_spaces += ' ' * len(Card.card_temp[0]) + '  '
         
         for row_index in range(7):
-            concated_row = padding_card_spaces
+            if padding_align > 0:
+                if padding_texts:
+                    one_pad = padding_texts.pop(0)
+                    chinese_chars = len(CHINESE_CHAR_PATTERN.findall(one_pad)) # 一个中文字符占用2个符号宽
+                    if '\x1b' in one_pad:
+                        actual_display_len = one_pad.find('\x1b') + 1 + (len(one_pad) - one_pad.find('\x1b[0m') - 4)
+                    else:
+                        actual_display_len = len(one_pad)
+                    padding_text_spaces = f'{one_pad}{" " * (padding_align - actual_display_len - chinese_chars)}'
+                else:
+                    padding_text_spaces = ' ' * padding_align
+            else:
+                padding_text_spaces = ''
+                
+            concated_row = padding_text_spaces + padding_card_spaces
             for card in cards:
                 card.generate_dot_matrix()
                 concated_row += self.render_card(card.dot_matrix[row_index]) + '  '
             print(concated_row)
-        print()
 
 
 if __name__ == "__main__":
@@ -435,3 +475,5 @@ if __name__ == "__main__":
         response = input("再来一局? (y,[回车]/n)")
         if not response.lower().startswith('y') and not response.strip() == '':
             break
+        else:
+            game.clear()
