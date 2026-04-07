@@ -42,7 +42,6 @@ class LoopPlayer(threading.Thread):
     def stop(self):
         self.is_stop = True
 
-
 class Card:
     face_down_rows = [
         "╭───────╮",
@@ -240,6 +239,7 @@ class Solitaire:
     ]
 
     def __init__(self, draw_count=1):
+        self.need_help = True # 第一次打印屏幕默认显示提示信息
         self.draw_count = draw_count  # 翻牌数量：1或3
         self.stock = Pile()  # 牌叠
         self.drawn_from_stock = Pile() # 从牌叠翻出的牌
@@ -448,9 +448,11 @@ class Solitaire:
     def display_operation_tips(self):
         # 显示操作提示
         print("\n操作提示:")
+        print("0. 输入 'h' 显示此提示信息")
         print("1. 输入 'd','/','0' 从备用牌堆抽牌")
         print("2. 输入 'w/8'(翻牌区), 'f/9'(基础牌堆), '1-7'(牌阵区) 移动纸牌")
         print("3. 输入 'x' 开始新游戏, 'q' 退出游戏")
+        self.need_help = False
 
     def display(self):
         # 清屏
@@ -460,10 +462,12 @@ class Solitaire:
         self.display_foundations()
         self.display_stock_and_waste()
         self.display_tableaus()
-        self.display_operation_tips()
+        if self.need_help:
+            self.display_operation_tips()
 
     def get_user_input(self):
         accepted_keys_and_map = {
+            b'h': 'help',
             b'd': 'draw', b'/': 'draw',
             b'H': 'up', b'P': 'down', b'K': 'left', b'M': 'right',
             b'x': 'new', b'q': 'quit',
@@ -498,7 +502,10 @@ class Solitaire:
             
             print("请输入操作: ")
             choice = self.get_user_input()
-            
+
+            if choice == 'help':
+                self.need_help = True
+                continue            
             if choice == 'quit':
                 return False
             elif choice == 'new':
