@@ -48,10 +48,7 @@ class Card:
         self.is_selected = False
     
     def __str__(self):
-        if not self.face_up:
-            return '\n'.join(self.face_down_rows)
-        else:
-            return '\n'.join(self.get_dot_matrix())
+        return self.suit + self.rank
     
     def set_selected(self, is_selected: bool):
         self.is_selected = is_selected
@@ -105,6 +102,9 @@ class Pile:
     def __init__(self):
         self.cards: list[Card] = []
     
+    def __str__(self):
+        return '\n'.join(map(str, self.cards))
+    
     def add_card(self, card: Card):
         self.cards.append(card)
     
@@ -118,10 +118,8 @@ class Pile:
                     return card
         return None
     
-    def get_top_card(self):
-        if self.cards:
-            return self.cards[-1]
-        return None
+    def remove_all(self):
+        self.cards.clear()
     
     def size(self):
         return len(self.cards)
@@ -129,6 +127,11 @@ class Pile:
     def is_empty(self):
         return len(self.cards) == 0
 
+    def get_top_card(self):
+        if self.cards:
+            return self.cards[-1]
+        return None
+    
     def get_top_continuous_cards(self):
         continuous_cards = []
         if self.cards:
@@ -215,7 +218,9 @@ class Solitaire:
     def __init__(self, draw_count=1):
         self.draw_count = draw_count  # 翻牌数量：1或3
         self.stock = Pile()  # 牌叠
+        self.drawn_from_stock = Pile() # 从牌叠翻出的牌
         self.waste = Pile()  # 废牌堆
+        
         self.foundations = [Pile() for _ in range(4)]  # 四个 foundation
         self.tableaus = [Pile() for _ in range(7)]  # 七个 tableau
         self.setup_game()
@@ -240,6 +245,14 @@ class Solitaire:
             self.stock.add_card(card)
     
     def draw_cards(self):
+        # 先将用剩的牌放到废弃区
+        if not self.drawn_from_stock.is_empty():
+            # 保持牌的顺序
+            for card in self.drawn_from_stock.cards:
+                card.face_up = False
+                self.waste.add_card(card)
+            self.drawn_from_stock.remove_all()
+        
         if self.stock.is_empty():
             # 牌叠空了，将废牌堆倒回牌叠
             while not self.waste.is_empty():
@@ -252,7 +265,7 @@ class Solitaire:
             if not self.stock.is_empty():
                 card = self.stock.remove_card()
                 card.face_up = True
-                self.waste.add_card(card)
+                self.drawn_from_stock.add_card(card)
     
     def is_valid_move_to_tableau(self, card, tableau):
         if tableau.is_empty():
@@ -365,9 +378,9 @@ class Solitaire:
             stock_lines = self.empty_slot
         
         waste_lines = []
-        if not self.waste.is_empty():
+        if not self.drawn_from_stock.is_empty():
             temp_pile = Pile()
-            for card in self.waste.cards[-1*self.draw_count:]:
+            for card in self.drawn_from_stock.cards:
                 temp_pile.add_card(card)
             all_card_arr = temp_pile.show_cards(compact=True)
             waste_lines = [""]
@@ -475,14 +488,14 @@ class Solitaire:
                 selected_pile = None
                 if choice == 'w':
                     if from_pile is None:
-                        if not self.waste.is_empty():
-                            self.waste.get_top_card().set_selected(True)
-                            selected_pile = self.waste
+                        if not self.drawn_from_stock.is_empty():
+                            self.drawn_from_stock.get_top_card().set_selected(True)
+                            selected_pile = self.drawn_from_stock
                             self.display()
                     else:
-                        if from_pile == self.waste:
+                        if from_pile == self.drawn_from_stock:
                             # unselect
-                            self.waste.get_top_card().set_selected(False)
+                            self.drawn_from_stock.get_top_card().set_selected(False)
                             from_pile = None
                 elif choice == 'f':
                     if from_pile is None:
