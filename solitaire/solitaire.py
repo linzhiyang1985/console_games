@@ -1,6 +1,9 @@
 import random
 import os
 import re
+import msvcrt
+import time
+import sys
 
 
 # 牌的定义
@@ -105,9 +108,14 @@ class Pile:
     def add_card(self, card: Card):
         self.cards.append(card)
     
-    def remove_card(self):
+    def remove_card(self, card: Card=None):
         if self.cards:
-            return self.cards.pop()
+            if card is None:
+                return self.cards.pop()
+            else:
+                if card in self.cards:
+                    self.cards.remove(card)
+                    return card
         return None
     
     def get_top_card(self):
@@ -120,6 +128,28 @@ class Pile:
     
     def is_empty(self):
         return len(self.cards) == 0
+
+    def get_top_continuous_cards(self):
+        continuous_cards = []
+        if self.cards:
+            for card in reversed(self.cards):
+                if not continuous_cards:
+                    continuous_cards.append(card)
+                    last_rank = card.get_rank_value()
+                elif card.face_up and card.get_rank_value() == last_rank + 1:
+                    continuous_cards.insert(0, card)
+                    last_rank = card.get_rank_value()
+                else:
+                    break
+        return continuous_cards
+
+    def select_continuous(self):
+        for card in self.get_top_continuous_cards():
+            card.set_selected(True)
+
+    def clear_selection(self):
+        for card in self.cards:
+            card.set_selected(False)
     
     def show_cards(self, direction='horizontal', compact=False):
         all_cards = []
@@ -158,6 +188,30 @@ class Pile:
         return all_cards
 
 class Solitaire:
+    empty_slot = [
+        "",
+        "╭───────╮",
+        "│       │",
+        "│       │",
+        "│ Empty │",
+        "│       │",
+        "│       │",
+        "╰───────╯",
+        ""
+    ]
+
+    stock_deck = [
+            "╭──────╮   ",
+            "│╭──────╮  ",
+            "││╭───────╮",
+            "│││░░░░░░░│",
+            "│││░░░░░░░│",
+            "│││░░░░░░░│",
+            "╰││░░░░░░░│",
+            " ╰│░░░░░░░│",
+            "  ╰───────╯"
+    ]
+
     def __init__(self, draw_count=1):
         self.draw_count = draw_count  # 翻牌数量：1或3
         self.stock = Pile()  # 牌叠
@@ -224,27 +278,50 @@ class Solitaire:
         if from_pile.is_empty():
             return False
         
-        card = from_pile.get_top_card()
+        is_valid = False
         
-        # 检查移动是否合法
-        if to_pile in self.tableaus:
-            if not self.is_valid_move_to_tableau(card, to_pile):
-                return False
-        elif to_pile in self.foundations:
-            if not self.is_valid_move_to_foundation(card, to_pile):
-                return False
-        
-        # 执行移动
-        from_pile.remove_card()
-        to_pile.add_card(card)
-        
-        # 如果是从 tableau 移动，检查新的顶部牌是否需要翻面
-        if from_pile in self.tableaus and not from_pile.is_empty():
+        if to_pile == self.foundations:
             top_card = from_pile.get_top_card()
-            if not top_card.face_up:
-                top_card.face_up = True
+            for foundation_pile in self.foundations:
+                if self.is_valid_move_to_foundation(top_card, foundation_pile):
+                    to_pile = foundation_pile
+                    is_valid = True
+                    break
+            if not is_valid:
+                return False
         
-        return True
+        if from_pile in self.tableaus and to_pile in self.tableaus:
+            continuous_cards = from_pile.get_top_continuous_cards()
+            for valid_index, card in enumerate(continuous_cards):
+                if self.is_valid_move_to_tableau(card, to_pile):
+                    # 从这张牌开始直到尾, 执行移动
+                    for i in range(valid_index, len(continuous_cards)):
+                        from_pile.remove_card(continuous_cards[i])
+                        to_pile.add_card(continuous_cards[i])
+                    is_valid = True
+                    break
+        else:
+            card = from_pile.get_top_card()
+            
+            # 检查移动是否合法
+            if to_pile in self.tableaus:
+                if not self.is_valid_move_to_tableau(card, to_pile):
+                    return False
+            
+            is_valid = True
+            # 执行移动
+            from_pile.remove_card()
+            to_pile.add_card(card)
+            card.set_selected(False)
+        
+        if is_valid:
+            # 如果是从 tableau 移动，检查新的顶部牌是否需要翻面
+            if from_pile in self.tableaus and not from_pile.is_empty():
+                top_card = from_pile.get_top_card()
+                if not top_card.face_up:
+                    top_card.face_up = True
+
+        return is_valid
     
     def check_win(self):
         # 检查所有 foundation 是否都有13张牌
@@ -273,7 +350,7 @@ class Solitaire:
                 card = foundation.get_top_card()
                 foundation_lines.extend([card.render_card_row(row) for row in card.get_dot_matrix()])
 
-        print("Foundations:")
+        print("Foundations(f):")
         for i in range(7):
             for j in range(4):
                 print(foundation_lines[i + j*7], end=" ")
@@ -283,29 +360,9 @@ class Solitaire:
         # 显示牌叠和废牌堆
         stock_lines = []
         if not self.stock.is_empty():
-            stock_lines = [
-                    "╭──────╮   ",
-                    "│╭──────╮  ",
-                    "││╭───────╮",
-                    "│││░░░░░░░│",
-                    "│││░░░░░░░│",
-                    "│││░░░░░░░│",
-                    "╰││░░░░░░░│",
-                    " ╰│░░░░░░░│",
-                    "  ╰───────╯"
-            ]
+            stock_lines = self.stock_deck
         else:
-            stock_lines = [
-                "",
-                "╭───────╮",
-                "│       │",
-                "│       │",
-                "│ Empty │",
-                "│       │",
-                "│       │",
-                "╰───────╯",
-                ""
-            ]
+            stock_lines = self.empty_slot
         
         waste_lines = []
         if not self.waste.is_empty():
@@ -317,19 +374,9 @@ class Solitaire:
             waste_lines.extend(all_card_arr)
             waste_lines.append("")
         else:
-            waste_lines = [
-                "",
-                "╭───────╮",
-                "│       │",
-                "│       │",
-                "│ Empty │",
-                "│       │",
-                "│       │",
-                "╰───────╯",
-                ""
-            ]
+            waste_lines = self.empty_slot
 
-        print("\nStock / Waste:")
+        print("\nStock  ||  Waste(w):")
         for i in range(9):
             print(stock_lines[i], end="  ")
             print(waste_lines[i])
@@ -353,15 +400,20 @@ class Solitaire:
                     tableau_lines[row_index] += '  ' + row
 
         print("\nTableaus:")
+        # print index
+        for i in range(7):
+            print(" " * 4 + str(i+1) + " " * 4, end="  ")
+        print()
+        # print cards
         for row in tableau_lines:
             print(row)
 
     def display_operation_tips(self):
         # 显示操作提示
         print("\n操作提示:")
-        print("1. 输入 'd' 从牌叠抽牌")
-        print("2. 输入 'm' 移动卡片")
-        print("3. 输入 'q' 退出游戏")
+        print("1. 输入 'd','/','0' 从牌叠抽牌")
+        print("2. 输入 'w/8' (waste), 'f/9' (foundation), '1-7' (tableau) 移动卡片")
+        print("3. 输入 'x' 开始新游戏, 'q' 退出游戏")
 
     def display(self):
         # 清屏
@@ -373,7 +425,33 @@ class Solitaire:
         self.display_tableaus()
         self.display_operation_tips()
 
+    def get_user_input(self):
+        accepted_keys_and_map = {
+            b'd': 'draw', b'/': 'draw',
+            b'H': 'up', b'P': 'down', b'K': 'left', b'M': 'right',
+            b'x': 'new', b'q': 'quit',
+            b'm': 'move',
+            b'1': '1', b'2': '2', b'3': '3', b'4': '4', b'5': '5', b'6': '6', b'7': '7',
+            b'w': 'w', b'8': 'w', b'0': 'w',
+            b'f': 'f', b'9': 'f',
+        }
+        key = None
+        while key is None:
+            if msvcrt.kbhit():
+                key = msvcrt.getch()
+                if key in (b'\xe0'):
+                    # arrow keys
+                    key = msvcrt.getch()
+                if key in accepted_keys_and_map:
+                    return accepted_keys_and_map[key]
+                else:
+                    key = None
+                print("输入无效，请重试:", end="")
+
     def play(self):
+        from_pile = None
+        to_pile = None
+
         while True:
             self.display()
             
@@ -381,80 +459,98 @@ class Solitaire:
                 print("恭喜你赢了！")
                 break
             
-            choice = input("请输入操作: ").strip().lower()
+            print("请输入操作: ")
+            choice = self.get_user_input()
             
-            if choice == 'q':
+            if choice == 'quit':
+                sys.exit()
+            elif choice == 'new':
                 break
-            elif choice == 'd':
+            elif choice == 'draw':
                 self.draw_cards()
-            elif choice == 'm':
-                # 移动卡片
-                print("\n移动卡片:")
-                print("来源选项: s (stock), w (waste), t1-t7 (tableau 1-7)")
-                print("目标选项: f1-f4 (foundation 1-4), t1-t7 (tableau 1-7)")
-                
-                source = input("请输入来源: ").strip().lower()
-                target = input("请输入目标: ").strip().lower()
-                
-                # 确定来源牌堆
                 from_pile = None
-                if source == 's':
-                    from_pile = self.stock
-                elif source == 'w':
-                    from_pile = self.waste
-                elif source.startswith('t'):
-                    try:
-                        idx = int(source[1]) - 1
-                        if 0 <= idx < 7:
-                            from_pile = self.tableaus[idx]
-                    except:
-                        pass
-                
-                # 确定目标牌堆
                 to_pile = None
-                if target.startswith('f'):
-                    try:
-                        idx = int(target[1]) - 1
-                        if 0 <= idx < 4:
-                            to_pile = self.foundations[idx]
-                    except:
-                        pass
-                elif target.startswith('t'):
-                    try:
-                        idx = int(target[1]) - 1
-                        if 0 <= idx < 7:
-                            to_pile = self.tableaus[idx]
-                    except:
-                        pass
+            elif choice in ('1', '2', '3', '4', '5', '6', '7', 'f', 'w'):
+                # 移动卡片
+                selected_pile = None
+                if choice == 'w':
+                    if from_pile is None:
+                        if not self.waste.is_empty():
+                            self.waste.get_top_card().set_selected(True)
+                            selected_pile = self.waste
+                            self.display()
+                    else:
+                        if from_pile == self.waste:
+                            # unselect
+                            self.waste.get_top_card().set_selected(False)
+                            from_pile = None
+                elif choice == 'f':
+                    if from_pile is None:
+                        for pile in self.foundations:
+                            if not pile.is_empty():
+                                selected_pile = pile
+                                pile.get_top_card().set_selected(True)
+                                break
+                    elif from_pile is not None and from_pile in self.foundations:
+                        # change to next non-empty foundation slot
+                        search_index = (self.foundations.index(from_pile) + 1) % 4
+                        for i in range(4):
+                            if not self.foundations[search_index].is_empty():
+                                from_pile.get_top_card().set_selected(False) # unselect previous one
+                                from_pile = self.foundations[search_index] # change to new one
+                                from_pile.get_top_card().set_selected(True) # highlight
+                                break
+                            else:
+                                search_index = (search_index + 1) % 4
+                    else:
+                        # will assign to to_pile
+                        selected_pile = self.foundations
+
+                elif choice in ('1', '2', '3', '4', '5', '6', '7'):
+                    selected_pile = self.tableaus[int(choice)-1]
+                    selected_pile.select_continuous()
+                    self.display()
+                
+                if selected_pile:           
+                    if from_pile is None:
+                        from_pile = selected_pile
+                    else:
+                        to_pile = selected_pile
                 
                 if from_pile and to_pile:
-                    if self.move_card(from_pile, to_pile):
+                    if from_pile != to_pile and self.move_card(from_pile, to_pile):
                         print("移动成功！")
                     else:
                         print("移动无效，请重试。")
-                else:
-                    print("输入无效，请重试。")
+                    
+                    from_pile.clear_selection()
+                    if isinstance(to_pile, Pile):
+                        to_pile.clear_selection()
+                    from_pile = None
+                    to_pile = None
             else:
                 print("输入无效，请重试。")
 
 def main():
     print("欢迎来到纸牌游戏！")
-    print("请选择翻牌模式:")
-    print("1. 翻1张")
-    print("2. 翻3张")
     
     while True:
-        choice = input("请输入选项 (1/2): ").strip()
-        if choice == '1':
-            game = Solitaire(draw_count=1)
-            break
-        elif choice == '2':
-            game = Solitaire(draw_count=3)
-            break
-        else:
-            print("输入无效，请重试。")
-    
-    game.play()
+        print("请选择翻牌模式:")
+        print("1. 翻1张")
+        print("2. 翻3张")
+        
+        while True:
+            choice = input("请输入选项 (1/2): ").strip()
+            if choice == '1':
+                game = Solitaire(draw_count=1)
+                break
+            elif choice == '2':
+                game = Solitaire(draw_count=3)
+                break
+            else:
+                print("输入无效，请重试。")
+        
+        game.play()
 
 if __name__ == "__main__":
     main()
