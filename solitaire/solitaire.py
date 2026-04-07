@@ -2,8 +2,10 @@ import random
 import os
 import re
 import msvcrt
-import time
 import sys
+import time
+import threading
+from playsound3 import playsound
 
 
 # 牌的定义
@@ -17,6 +19,28 @@ YELLOW = "\033[93m"
 RED = "\033[91m"
 GREEN = "\033[92m"
 RESET = "\033[0m"
+
+class LoopPlayer(threading.Thread):
+    def __init__(self):
+        super().__init__()
+        self.sound_file = r'./sound/background.mid'
+        self.sound_handle = None
+        self.is_stop = False
+        
+    def run(self):
+        self.sound_handle = playsound(self.sound_file, block=False)
+        start_time = time.time()
+        while not self.is_stop:
+            if time.time() - start_time >= 260: # whole sound duration
+                # loop the sound
+                self.sound_handle.stop()
+                self.sound_handle = playsound(self.sound_file, block=False)
+                start_time = time.time()
+            time.sleep(1)
+        self.sound_handle.stop()
+    
+    def stop(self):
+        self.is_stop = True
 
 
 class Card:
@@ -224,7 +248,7 @@ class Solitaire:
         self.foundations = [Pile() for _ in range(4)]  # 四个 foundation
         self.tableaus = [Pile() for _ in range(7)]  # 七个 tableau
         self.setup_game()
-    
+
     def setup_game(self):
         # 创建一副完整的牌
         deck = [Card(suit, rank) for suit in SUITS for rank in RANKS]
@@ -363,7 +387,7 @@ class Solitaire:
                 card = foundation.get_top_card()
                 foundation_lines.extend([card.render_card_row(row) for row in card.get_dot_matrix()])
 
-        print("Foundations(f):")
+        print("基础牌堆(f):")
         for i in range(7):
             for j in range(4):
                 print(foundation_lines[i + j*7], end=" ")
@@ -389,7 +413,7 @@ class Solitaire:
         else:
             waste_lines = self.empty_slot
 
-        print("\nStock  ||  Waste(w):")
+        print("\n备用牌堆  ||  翻牌堆(w):")
         for i in range(9):
             print(stock_lines[i], end="  ")
             print(waste_lines[i])
@@ -412,7 +436,7 @@ class Solitaire:
                         tableau_lines[row_index] += ' ' * (expect_preceeding_size - valid_display_char_size)
                     tableau_lines[row_index] += '  ' + row
 
-        print("\nTableaus:")
+        print("\n牌阵区:")
         # print index
         for i in range(7):
             print(" " * 4 + str(i+1) + " " * 4, end="  ")
@@ -424,8 +448,8 @@ class Solitaire:
     def display_operation_tips(self):
         # 显示操作提示
         print("\n操作提示:")
-        print("1. 输入 'd','/','0' 从牌叠抽牌")
-        print("2. 输入 'w/8' (waste), 'f/9' (foundation), '1-7' (tableau) 移动卡片")
+        print("1. 输入 'd','/','0' 从备用牌堆抽牌")
+        print("2. 输入 'w/8'(翻牌区), 'f/9'(基础牌堆), '1-7'(牌阵区) 移动纸牌")
         print("3. 输入 'x' 开始新游戏, 'q' 退出游戏")
 
     def display(self):
@@ -476,9 +500,9 @@ class Solitaire:
             choice = self.get_user_input()
             
             if choice == 'quit':
-                sys.exit()
+                return False
             elif choice == 'new':
-                break
+                return True
             elif choice == 'draw':
                 self.draw_cards()
                 from_pile = None
@@ -563,7 +587,13 @@ def main():
             else:
                 print("输入无效，请重试。")
         
-        game.play()
+        new_game = game.play()
+        if not new_game:
+            print("感谢游玩纸牌游戏！再见!")
+            break
 
 if __name__ == "__main__":
+    background_player = LoopPlayer()
+    background_player.start()
     main()
+    background_player.stop()
