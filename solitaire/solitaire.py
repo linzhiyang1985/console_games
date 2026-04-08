@@ -251,8 +251,11 @@ class Solitaire:
 
     def setup_game(self):
         # 创建一副完整的牌
-        deck = [Card(suit, rank) for suit in SUITS for rank in RANKS]
-        
+        rnd_suit = SUITS.copy()
+        random.shuffle(rnd_suit)
+        rnd_rank = RANKS.copy()
+        random.shuffle(rnd_rank)
+        deck = [Card(suit, rank) for suit in rnd_suit for rank in rnd_rank]
         # 洗牌
         random.shuffle(deck)
         
@@ -291,6 +294,17 @@ class Solitaire:
                 card.face_up = True
                 self.drawn_from_stock.add_card(card)
     
+    def shuffle_stock(self):
+        while not self.drawn_from_stock.is_empty():
+            card = self.drawn_from_stock.remove_card()
+            card.face_up = False
+            self.stock.add_card(card)
+        while not self.waste.is_empty():
+            card = self.waste.remove_card()
+            card.face_up = False
+            self.stock.add_card(card)
+        random.shuffle(self.stock.cards)
+
     def is_valid_move_to_tableau(self, card, tableau):
         if tableau.is_empty():
             return card.rank == 'K'  # 空 tableau 只能放 K
@@ -450,8 +464,9 @@ class Solitaire:
         print("\n操作提示:")
         print("0. 输入 'h' 显示此提示信息")
         print("1. 输入 'd','/','0' 从备用牌堆抽牌")
-        print("2. 输入 'w/8'(翻牌区), 'f/9'(基础牌堆), '1-7'(牌阵区) 移动纸牌")
-        print("3. 输入 'x' 开始新游戏, 'q' 退出游戏")
+        print("2. 输入 's', '*' 备用牌堆重洗牌[相当于翻1张牌]")
+        print("3. 输入 'w/8'(翻牌区), 'f/9'(基础牌堆), '1-7'(牌阵区) 移动纸牌")
+        print("4. 输入 'x' 开始新游戏, 'q' 退出游戏")
         self.need_help = False
 
     def display(self):
@@ -469,6 +484,7 @@ class Solitaire:
         accepted_keys_and_map = {
             b'h': 'help',
             b'd': 'draw', b'/': 'draw',
+            b's': 'shuffle', b'*': 'shuffle',
             b'H': 'up', b'P': 'down', b'K': 'left', b'M': 'right',
             b'x': 'new', b'q': 'quit',
             b'm': 'move',
@@ -497,23 +513,35 @@ class Solitaire:
             self.display()
             
             if self.check_win():
-                print("恭喜你赢了！")
-                break
+                print(f"\n{RED}❉⊱•❉⊱• 恭喜你赢了! •⊰❉•⊰❉{RESET}")
+                new_round = input("再玩一局(y/n)?")
+                if new_round.lower() != 'y':
+                    return False
+                else:
+                    return True
             
             print("请输入操作: ")
             choice = self.get_user_input()
 
             if choice == 'help':
                 self.need_help = True
-                continue            
+                continue
             if choice == 'quit':
-                return False
+                quit_confirm = input("确认退出游戏(y/n)?")
+                if quit_confirm.lower() == 'y':
+                    return False
             elif choice == 'new':
-                return True
+                new_round_confirm = input("确认重开一局(y/n)?")
+                if new_round_confirm.lower() == 'y':
+                    return True
+                else:
+                    continue
             elif choice == 'draw':
                 self.draw_cards()
                 from_pile = None
                 to_pile = None
+            elif choice == 'shuffle':
+                self.shuffle_stock()
             elif choice in ('1', '2', '3', '4', '5', '6', '7', 'f', 'w'):
                 # 移动卡片
                 selected_pile = None
@@ -602,5 +630,9 @@ def main():
 if __name__ == "__main__":
     background_player = LoopPlayer()
     background_player.start()
-    main()
-    background_player.stop()
+    try:
+        main()
+    except Exception:
+        print("游戏已中断。")
+    finally:
+        background_player.stop()
