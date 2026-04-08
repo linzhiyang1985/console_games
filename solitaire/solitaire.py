@@ -42,6 +42,19 @@ class LoopPlayer(threading.Thread):
     def stop(self):
         self.is_stop = True
 
+background_player = None
+def mute_or_unmute():
+    global background_player
+    if background_player is None:
+        # unmute, restart play
+        background_player = LoopPlayer()
+        background_player.start()
+    else:
+        background_player.stop()
+        background_player = None
+    print("背景音乐已静音。")
+
+
 class Card:
     face_down_rows = [
         "╭───────╮",
@@ -463,10 +476,11 @@ class Solitaire:
         # 显示操作提示
         print("\n操作提示:")
         print("0. 输入 'h' 显示此提示信息")
-        print("1. 输入 'd','/','0' 从备用牌堆抽牌")
-        print("2. 输入 's', '*' 备用牌堆重洗牌[相当于翻1张牌]")
-        print("3. 输入 'w/8'(翻牌区), 'f/9'(基础牌堆), '1-7'(牌阵区) 移动纸牌")
-        print("4. 输入 'x' 开始新游戏, 'q' 退出游戏")
+        print("1. 输入 'e' 静音/播放背景音乐")
+        print("2. 输入 'd','/' 从备用牌堆抽牌")
+        print("3. 输入 's', '*' 备用牌堆重洗牌[相当于翻1张牌]")
+        print("4. 输入 'w/8'(翻牌区), 'f/9'(基础牌堆), '1-7'(牌阵区), 在之间移动纸牌")
+        print("5. 输入 'x' 开始新游戏, 'q' 退出游戏")
         self.need_help = False
 
     def display(self):
@@ -483,14 +497,15 @@ class Solitaire:
     def get_user_input(self):
         accepted_keys_and_map = {
             b'h': 'help',
+            b'e': 'mute', # mute or unmute background sound
             b'd': 'draw', b'/': 'draw',
             b's': 'shuffle', b'*': 'shuffle',
-            b'H': 'up', b'P': 'down', b'K': 'left', b'M': 'right',
-            b'x': 'new', b'q': 'quit',
-            b'm': 'move',
             b'1': '1', b'2': '2', b'3': '3', b'4': '4', b'5': '5', b'6': '6', b'7': '7',
-            b'w': 'w', b'8': 'w', b'0': 'w',
+            b'w': 'w', b'8': 'w',
             b'f': 'f', b'9': 'f',
+            b'x': 'new', b'q': 'quit',
+            b'\r': 'enter', b'\x1b': 'esc',
+            b'y': 'y', b'n': 'n'
         }
         key = None
         while key is None:
@@ -514,8 +529,10 @@ class Solitaire:
             
             if self.check_win():
                 print(f"\n{RED}❉⊱•❉⊱• 恭喜你赢了! •⊰❉•⊰❉{RESET}")
-                new_round = input("再玩一局(y/n)?")
-                if new_round.lower() != 'y':
+                
+                print("再玩一局(y,[enter] || n, [esc])?")
+                new_round_confirm = self.get_user_input()
+                if new_round_confirm in ('y', 'enter'):
                     return False
                 else:
                     return True
@@ -526,13 +543,17 @@ class Solitaire:
             if choice == 'help':
                 self.need_help = True
                 continue
-            if choice == 'quit':
-                quit_confirm = input("确认退出游戏(y/n)?")
-                if quit_confirm.lower() == 'y':
+            elif choice == 'mute':
+                mute_or_unmute()
+            elif choice == 'quit':
+                print("确认退出游戏(y,[enter] || n, [esc])?")
+                quit_confirm = self.get_user_input()
+                if quit_confirm in ('y', 'enter'):
                     return False
             elif choice == 'new':
-                new_round_confirm = input("确认重开一局(y/n)?")
-                if new_round_confirm.lower() == 'y':
+                print("确认重开一局(y,[enter] || n, [esc])?")
+                new_round_confirm = self.get_user_input()
+                if new_round_confirm in ('y', 'enter'):
                     return True
                 else:
                     continue
@@ -611,28 +632,37 @@ def main():
         print("1. 翻1张")
         print("2. 翻3张")
         
+        game = None
         while True:
-            choice = input("请输入选项 (1/2): ").strip()
+            choice = input("请输入选项 (1/2), q退出: ").lower().strip()
             if choice == '1':
                 game = Solitaire(draw_count=1)
                 break
             elif choice == '2':
                 game = Solitaire(draw_count=3)
                 break
+            elif choice == 'q':
+                print("游戏已退出。")
+                break
             else:
                 print("输入无效，请重试。")
-        
-        new_game = game.play()
-        if not new_game:
-            print("感谢游玩纸牌游戏！再见!")
+        if isinstance(game, Solitaire):
+            # 说明选择了1或2, game初始化成功, 开始游戏
+            new_game = game.play()
+            if not new_game:
+                print("感谢游玩纸牌游戏！再见!")
+                break
+        else:
+            # 说明选择了q, 游戏退出
             break
 
+
 if __name__ == "__main__":
-    background_player = LoopPlayer()
-    background_player.start()
+    mute_or_unmute()
     try:
         main()
     except Exception:
         print("游戏已中断。")
     finally:
-        background_player.stop()
+        if background_player:
+            background_player.stop()
