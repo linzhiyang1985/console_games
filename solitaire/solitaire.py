@@ -95,12 +95,12 @@ class Card:
 
     def render_card_row(self, card_row_str):
         rendered_str = ''
-        char_color = RED if ('♥' in card_row_str or '♦' in card_row_str) else BLUE
+        suit_color = RED if ('♥' in card_row_str or '♦' in card_row_str) else BLUE
         for ch in card_row_str:
             if ch in ('╭', '─', '╮', '│', '╰', '╯'):
                 rendered_str += (YELLOW if self.is_selected else GREEN) + ch + RESET
-            elif ch in ('♠', '♣', '♦', '♥', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '1', '0', 'J', 'Q', 'K'):
-                rendered_str += char_color + ch + RESET
+            elif ch in ('♠', '♣', '♦', '♥'): #'A', '2', '3', '4', '5', '6', '7', '8', '9', '1', '0', 'J', 'Q', 'K'
+                rendered_str += suit_color + ch + RESET
             elif ch == ' ':
                 rendered_str += ' '
             else:
