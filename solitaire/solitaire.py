@@ -581,6 +581,7 @@ class Solitaire:
             elif choice == 'shuffle':
                 self.drawn_from_stock.clear_selection()
                 self.shuffle_stock()
+                self.draw_cards()
             elif choice == 'up':
                 self.move_all_ready_cards_into_foundation()
             elif choice in ('1', '2', '3', '4', '5', '6', '7', 'f', 'w'):
