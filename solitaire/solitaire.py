@@ -2,7 +2,6 @@ import random
 import os
 import re
 import msvcrt
-import sys
 import time
 import threading
 from playsound3 import playsound
@@ -379,14 +378,31 @@ class Solitaire:
             card.set_selected(False)
         
         if is_valid:
-            # 如果是从 tableau 移动，检查新的顶部牌是否需要翻面
-            if from_pile in self.tableaus and not from_pile.is_empty():
+            # 如果是从 tableau 或 drawn_from_stock 移动，检查新的顶部牌是否需要翻面
+            if (from_pile in self.tableaus or from_pile == self.drawn_from_stock) and not from_pile.is_empty():
                 top_card = from_pile.get_top_card()
                 if not top_card.face_up:
                     top_card.face_up = True
+            # 如果是从 drawn_from_stock 移动，如果空了, 则从牌叠翻牌
+            if from_pile == self.drawn_from_stock and self.drawn_from_stock.is_empty() and not self.stock.is_empty():
+                self.draw_cards()
 
         return is_valid
     
+    def move_all_ready_cards_into_foundation(self):
+        moved = True
+        while moved:
+            moved = self.move_card(self.drawn_from_stock, self.foundations)
+            if moved:
+                continue
+
+            for pile in self.tableaus:
+                if not pile.is_empty():
+                    moved = self.move_card(pile, self.foundations)
+                    if moved:
+                        # any of the piles had card moved, leave for loop
+                        break
+
     def check_win(self):
         # 检查所有 foundation 是否都有13张牌
         for foundation in self.foundations:
@@ -480,7 +496,8 @@ class Solitaire:
         print("2. 输入 'd','/' 从备用牌堆抽牌")
         print("3. 输入 's', '*' 备用牌堆重洗牌[相当于翻1张牌]")
         print("4. 输入 'w/8'(翻牌区), 'f/9'(基础牌堆), '1-7'(牌阵区), 在之间移动纸牌")
-        print("5. 输入 'x' 开始新游戏, 'q' 退出游戏")
+        print("5. 输入 'u', '0' 将所有准备好的牌移到基础牌堆")
+        print("6. 输入 'x' 开始新游戏, 'q' 退出游戏")
         self.need_help = False
 
     def display(self):
@@ -503,6 +520,7 @@ class Solitaire:
             b'1': '1', b'2': '2', b'3': '3', b'4': '4', b'5': '5', b'6': '6', b'7': '7',
             b'w': 'w', b'8': 'w',
             b'f': 'f', b'9': 'f',
+            b'u': 'up', b'0': 'up', # move all ready cards into foundation
             b'x': 'new', b'q': 'quit',
             b'\r': 'enter', b'\x1b': 'esc',
             b'y': 'y', b'n': 'n'
@@ -558,11 +576,13 @@ class Solitaire:
                 else:
                     continue
             elif choice == 'draw':
+                self.drawn_from_stock.clear_selection()
                 self.draw_cards()
-                from_pile = None
-                to_pile = None
             elif choice == 'shuffle':
+                self.drawn_from_stock.clear_selection()
                 self.shuffle_stock()
+            elif choice == 'up':
+                self.move_all_ready_cards_into_foundation()
             elif choice in ('1', '2', '3', '4', '5', '6', '7', 'f', 'w'):
                 # 移动卡片
                 selected_pile = None
