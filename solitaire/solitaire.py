@@ -551,9 +551,9 @@ class Solitaire:
                 print("再玩一局(y,[enter] || n, [esc])?")
                 new_round_confirm = self.get_user_input()
                 if new_round_confirm in ('y', 'enter'):
-                    return False
-                else:
                     return True
+                else:
+                    return False
             
             print("请输入操作: ")
             choice = self.get_user_input()
@@ -627,9 +627,13 @@ class Solitaire:
                 
                 if selected_pile:           
                     if from_pile is None:
-                        from_pile = selected_pile
+                        #尝试设置from_pile
+                        if selected_pile.is_empty():
+                            continue # 空牌堆不能作为from_pile
+                        else:
+                            from_pile = selected_pile
                     else:
-                        to_pile = selected_pile
+                        to_pile = selected_pile #空牌堆可以作为to_pile
                 
                 if from_pile and to_pile:
                     if from_pile != to_pile and self.move_card(from_pile, to_pile):
@@ -655,12 +659,12 @@ def main():
         
         game = None
         while True:
-            choice = input("请输入选项 (1/2), q退出: ").lower().strip()
-            if choice == '1':
-                game = Solitaire(draw_count=1)
-                break
-            elif choice == '2':
+            choice = input("请输入选项 1/2([回车]默认), q退出: ").lower().strip()
+            if choice == '' or choice == '2':
                 game = Solitaire(draw_count=3)
+                break
+            elif choice == '1':
+                game = Solitaire(draw_count=1)
                 break
             elif choice == 'q':
                 print("游戏已退出。")
