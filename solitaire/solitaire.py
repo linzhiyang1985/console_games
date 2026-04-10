@@ -22,7 +22,7 @@ RESET = "\033[0m"
 class LoopPlayer(threading.Thread):
     def __init__(self):
         super().__init__()
-        self.sound_file = r'./sound/background.mid'
+        self.sound_file = r'./sound/background.mp3'
         self.sound_handle = None
         self.is_stop = False
         
@@ -51,7 +51,6 @@ def mute_or_unmute():
     else:
         background_player.stop()
         background_player = None
-    print("背景音乐已静音。")
 
 
 class Card:
