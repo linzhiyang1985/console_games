@@ -389,19 +389,21 @@ class Solitaire:
 
         return is_valid
     
+    def move_one_ready_card_into_foundation(self):
+        # check drawn_from_stock and each tableaus
+        check_pile_list = [self.drawn_from_stock] + self.tableaus
+        # checking
+        for pile in check_pile_list:
+            moved = self.move_card(pile, self.foundations)
+            if moved:
+                # any of the piles had card moved, leave for loop
+                return True
+        return False
+
     def move_all_ready_cards_into_foundation(self):
         moved = True
         while moved:
-            moved = self.move_card(self.drawn_from_stock, self.foundations)
-            if moved:
-                continue
-
-            for pile in self.tableaus:
-                if not pile.is_empty():
-                    moved = self.move_card(pile, self.foundations)
-                    if moved:
-                        # any of the piles had card moved, leave for loop
-                        break
+            moved = self.move_one_ready_card_into_foundation()
 
     def check_win(self):
         # 检查所有 foundation 是否都有13张牌
@@ -541,6 +543,7 @@ class Solitaire:
     def play(self):
         from_pile = None
         to_pile = None
+        up_ready_card_flag = False
 
         while True:
             self.display()
@@ -555,8 +558,11 @@ class Solitaire:
                 else:
                     return False
             
-            print("请输入操作: ")
-            choice = self.get_user_input()
+            if up_ready_card_flag:
+                choice = 'up'
+            else:
+                print("请输入操作: ")
+                choice = self.get_user_input()
 
             if choice == 'help':
                 self.need_help = True
@@ -583,7 +589,11 @@ class Solitaire:
                 self.shuffle_stock()
                 self.draw_cards()
             elif choice == 'up':
-                self.move_all_ready_cards_into_foundation()
+                # self.move_all_ready_cards_into_foundation() # no animation
+                ## animation version
+                up_ready_card_flag = self.move_one_ready_card_into_foundation()
+                if up_ready_card_flag:
+                    time.sleep(0.4) # animation time for each move
             elif choice in ('1', '2', '3', '4', '5', '6', '7', 'f', 'w'):
                 # 移动卡片
                 selected_pile = None
