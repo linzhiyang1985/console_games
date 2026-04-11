@@ -537,12 +537,13 @@ class Solitaire:
                     return accepted_keys_and_map[key]
                 else:
                     key = None
-                print("输入无效，请重试:", end="")
+                    print("\r输入无效，请重试(检查数字键盘是否已打开):", end="")
 
     def play(self):
         from_pile = None
         to_pile = None
         up_ready_card_flag = False
+        choice = None
 
         while True:
             self.display()
