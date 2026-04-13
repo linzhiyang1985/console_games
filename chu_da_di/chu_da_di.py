@@ -1,9 +1,10 @@
 import random
+import re
+import os
 
 DISPLAY_SUITS = {'S': '♠', 'H': '♥', 'C': '♣', 'D': '♦'}
 DISPLAY_RANKS = {'A':'𝐀', '2':'𝟮', '3':'𝟯', '4':'𝟰', '5':'𝟱', '6':'𝟲',
                  '7':'𝟳', '8':'𝟴', '9':'𝟵', '10':'𝟭𝟬', 'J':'𝐉', 'Q':'𝐐', 'K':'𝐊'}
-
 
 BLUE = "\033[94m"
 YELLOW = "\033[93m"
@@ -109,6 +110,9 @@ class Pile:
     def __len__(self):
         return len(self.cards)
 
+    def __getitem__(self, index):
+        return self.cards[index]
+
     def add_card(self, card: Card):
         self.cards.append(card)
     
@@ -116,11 +120,17 @@ class Pile:
         # 按点数和花色排序
         self.cards.sort(key=lambda card: (card.get_rank_value(), card.get_suit_value()))
     
-    def __getitem__(self, index):
-        return self.cards[index]
-
     def remove(self, card):
         self.cards.remove(card)
+    
+    def clear_cards(self):
+        self.cards.clear()
+    
+    def refresh_cards(self, cards):
+        self.clear_cards()
+        for card in cards:
+            self.add_card(card)
+        self.sort_cards()
 
     def clear_selection(self):
         for card in self.cards:
@@ -133,6 +143,15 @@ class Pile:
     def get_selected_cards(self):
         return [card for card in self.cards if card.is_selected]
     
+    def set_all_face_up(self):
+        for card in self.cards:
+            card.set_face_up(True)
+    
+    def set_all_face_down(self):
+        for card in self.cards:
+            card.set_face_up(False)
+
+
     def show_cards(self, direction='horizontal', compact=False):
         all_cards = []
         if direction == 'horizontal':
@@ -140,7 +159,10 @@ class Pile:
                 concated_row = ''
                 size = len(self.cards)
                 for index, card in enumerate(self.cards):
-                    arr = card.get_dot_matrix().copy()
+                    if card.face_up:
+                        arr = card.get_dot_matrix().copy()
+                    else:
+                        arr = Card.face_down_card_temp.copy()
                     if card.is_selected:
                         arr.append(' ' * 9)
                     else:
@@ -157,12 +179,6 @@ class Pile:
             pile_size = len(self.cards)
             for index, card in enumerate(self.cards):
                 arr = card.get_dot_matrix().copy()
-                if card.is_selected:
-                    arr.append(' ' * 9)
-                    arr.append(' ' * 9)
-                else:
-                    arr.insert(0, ' ' * 9)
-                    arr.insert(0, ' ' * 9)
                 if index == pile_size - 1:
                     # last card
                     if card.face_up:
@@ -200,6 +216,7 @@ class Player:
 class Game:
     def __init__(self):
         self.players = [Player('玩家', is_human=True), Player('电脑1'), Player('电脑2'), Player('电脑3')]
+        self.player_last_moves = [Pile() for _ in self.players]
         self.current_player_index = 0
         self.last_player_index = -1
         self.last_cards = []
@@ -517,9 +534,128 @@ class Game:
             return Card('S', four_rank).get_rank_value() * 1000000
         return 0
 
-    def print_player_cards(self):
-        for player in self.players:
-            print(str(player))
+    # def print_player_cards(self):
+    #     for player in self.players:
+    #         print(str(player))
+
+    def print_title(self):
+        print("=== 锄大地游戏 ===")
+    
+    @staticmethod
+    def center_just(row, target_size=100):
+        valid_display_char_size = len(re.sub(r'\x1b\[\d+m', '', row))
+        left_padding = ' ' * ((target_size - valid_display_char_size)//2)
+        right_padding = ' ' * (target_size - len(left_padding) - valid_display_char_size)
+        return left_padding + row + right_padding
+    
+    @staticmethod
+    def left_just(row, target_size=45):
+        valid_display_char_size = len(re.sub(r'\x1b\[\d+m', '', row))
+        left_padding = ' ' * (target_size - valid_display_char_size)
+        return row + left_padding
+    
+    @staticmethod
+    def right_just(row, target_size=45):
+        valid_display_char_size = len(re.sub(r'\x1b\[\d+m', '', row))
+        right_padding = ' ' * (target_size - valid_display_char_size)
+        return right_padding + row
+    
+    def print_upper_player_deck(self, player:Player):
+        if player.cards:
+            for row in player.cards.show_cards(direction='horizontal', compact=True):
+                print(self.center_just(row, 118))
+        else:
+            print(self.center_just(' 不出 ', 118))
+
+    def build_table(self):
+        table_rows = []
+
+        if self.player_last_moves[2].cards:
+            upper_cards = self.player_last_moves[2].show_cards(direction='horizontal', compact=False)
+            # pad head and tail
+            for row in upper_cards:
+                table_rows.append(self.center_just(row, 100))
+        else:
+            for _ in range(7):
+                table_rows.append(' ' * 100)
+        
+        # margin
+        for _ in range(3):
+            table_rows.append(' ' * 100)
+
+        left_cards = self.player_last_moves[3].show_cards(direction='horizontal', compact=False)
+        right_cards = self.player_last_moves[1].show_cards(direction='horizontal', compact=False)
+        for row_index in range(8):
+            if row_index < len(left_cards):
+                left_row = self.left_just(left_cards[row_index])
+            else:
+                left_row = ' ' * 9 * 5 # maximum 5 cards
+            
+            if row_index < len(right_cards):
+                right_row = self.right_just(right_cards[row_index])
+            else:
+                right_row = ' ' * 9 * 5 # maximum 5 cards
+
+            new_row = left_row + ' ' * 10 +  right_row
+            table_rows.append(new_row)
+        
+        # margin
+        for _ in range(4):
+            table_rows.append(' ' * 100)
+        
+        if self.player_last_moves[0].cards:
+            lower_cards = self.player_last_moves[0].show_cards(direction='horizontal', compact=False)
+            # pad head and tail
+            for row in lower_cards:
+                table_rows.append(self.center_just(row, 100))
+        else:
+            for _ in range(7):
+                table_rows.append(' ' * 100)
+
+        return table_rows
+
+    def print_left_right_player_deck(self, left_player:Player, right_player:Player):
+        left_cards = left_player.cards.show_cards(direction='vertical', compact=True)
+        right_cards = right_player.cards.show_cards(direction='vertical', compact=True)
+        
+        table_area = self.build_table()
+        for row_index in range(31):
+            if row_index < len(left_cards):
+                left_row = left_cards[row_index]
+            else:
+                left_row = ' ' * 9
+            
+            if row_index < len(right_cards):
+                right_row = right_cards[row_index]
+            else:
+                right_row = ' ' * 9
+            
+            if row_index < len(table_area):
+                table_row = table_area[row_index]
+            else:
+                table_row = ' ' * 100
+
+            new_row = left_row + table_row  + right_row
+            print(new_row)
+    
+    def print_lower_player_deck(self, player:Player):
+        if player.cards:
+            for row in player.cards.show_cards(direction='horizontal', compact=True):
+                print(self.center_just(row, 118)) # 9 + 100 + 9
+        else:
+            print(self.center_just(' 不出 ', 118))
+
+    def clear(self):
+        os.system('cls')
+
+    def display(self):
+        self.clear()
+        self.print_title()
+        self.print_upper_player_deck(self.players[2])
+        self.print_left_right_player_deck(self.players[3], self.players[1])
+        self.print_lower_player_deck(self.players[0])
+        input('')
+        
 
     def play(self):
         self.deal_cards()
@@ -527,7 +663,8 @@ class Game:
         
         print("=== 锄大地游戏开始 ===")
         print(f"首家是: {self.players[self.current_player_index].name}")
-        
+        self.display()
+
         while True:
             current_player = self.players[self.current_player_index]
             print(f"\n{current_player.name}'s turn")
@@ -539,6 +676,7 @@ class Game:
                 if not valid_moves:
                     print("没有可出的牌，选择Pass")
                     self.pass_count += 1
+                    self.player_last_moves[self.current_player_index].clear_cards()
                 else:
                     # 检查是否是所有人Pass后由最后出牌的人继续出牌
                     must_play = (self.last_cards == [] and self.pass_count == 0 and self.last_player_index == -1)
@@ -555,14 +693,19 @@ class Game:
                             if not must_play and choice == 0:
                                 print("你选择了Pass")
                                 self.pass_count += 1
+                                self.player_last_moves[self.current_player_index].clear_cards()
                                 break
                             elif 1 <= choice <= len(valid_moves):
                                 chosen_move = valid_moves[choice-1]
                                 current_player.play_card(chosen_move)
+                                self.player_last_moves[self.current_player_index].refresh_cards(chosen_move)
+                                self.player_last_moves[self.current_player_index].set_all_face_up()
+
                                 self.last_cards = chosen_move
                                 self.last_player_index = self.current_player_index
                                 self.pass_count = 0
-                                print(f"你出了: {chosen_move} ({self.determine_card_type(chosen_move)}), 剩余{len(current_player.cards)}张牌")
+                                # print(f"你出了: {chosen_move} ({self.determine_card_type(chosen_move)}), 剩余{len(current_player.cards)}张牌")
+                                self.display()
                                 break
                             else:
                                 print("输入无效，请重新输入")
@@ -578,24 +721,35 @@ class Game:
                     if valid_moves:
                         chosen_move = self.ai_choose_move(current_player, self.last_cards)
                         current_player.play_card(chosen_move)
+                        self.player_last_moves[self.current_player_index].refresh_cards(chosen_move)
+                        self.player_last_moves[self.current_player_index].set_all_face_up()
+
                         self.last_cards = chosen_move
                         self.last_player_index = self.current_player_index
                         self.pass_count = 0
-                        print(f"{current_player.name} 出了: {chosen_move} ({self.determine_card_type(chosen_move)}), 剩余{len(current_player.cards)}张牌")
+                        # print(f"{current_player.name} 出了: {chosen_move} ({self.determine_card_type(chosen_move)}), 剩余{len(current_player.cards)}张牌")
                     else:
-                        print(f"{current_player.name} 没有可出的牌")
+                        # print(f"{current_player.name} 没有可出的牌")
                         self.pass_count += 1
+                        self.player_last_moves[self.current_player_index].clear_cards()
                 else:
                     chosen_move = self.ai_choose_move(current_player, self.last_cards)
+
                     if not chosen_move:
                         print(f"{current_player.name} Pass")
                         self.pass_count += 1
+                        self.player_last_moves[self.current_player_index].clear_cards()
                     else:
                         current_player.play_card(chosen_move)
+                        self.player_last_moves[self.current_player_index].refresh_cards(chosen_move)
+                        self.player_last_moves[self.current_player_index].set_all_face_up()
+
                         self.last_cards = chosen_move
                         self.last_player_index = self.current_player_index
                         self.pass_count = 0
-                        print(f"{current_player.name} 出了: {chosen_move} ({self.determine_card_type(chosen_move)}), 剩余{len(current_player.cards)}张牌")
+                        # print(f"{current_player.name} 出了: {chosen_move} ({self.determine_card_type(chosen_move)}), 剩余{len(current_player.cards)}张牌")
+                
+                self.display()
             
             # 检查是否有人出完牌
             if not current_player.cards:
