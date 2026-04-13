@@ -39,27 +39,36 @@ class Card:
     def __init__(self, suit, rank):
         self.suit = suit  # 花色: 'S'=黑桃, 'H'=红桃, 'C'=梅花, 'D'=方块
         self.rank = rank  # 点数: '2'-'A'
-        self.dot_matrix = None
+        self.face_up = False  # 是否正面朝上
+        self.dot_matrix = None  # 卡片的点阵表示
+        self.is_selected = False
         
     def __repr__(self):
-        suit_symbols = {'S': '♠', 'H': '♥', 'C': '♣', 'D': '♦'}
-        # suit_symbols = {'S': 'S', 'H': 'H', 'C': 'C', 'D': 'D'}
-        return f"{suit_symbols[self.suit]}{self.rank}"
+        return f"{DISPLAY_SUITS[self.suit]}{DISPLAY_RANKS[self.rank]}"
     
+    def __eq__(self, other):
+        return self.suit == other.suit and self.rank == other.rank
+
+    def set_selected(self, is_selected: bool):
+        self.is_selected = is_selected
+    
+    def set_face_up(self, face_up: bool):
+        self.face_up = face_up
+
     def get_dot_matrix(self):
         if self.dot_matrix is not None:
             return self.dot_matrix
         ## 只生成一次
         if len(self.rank) == 1:
-            rank_left = DISPLAY_RANKS[RANKS.index(self.rank)] + ' '
-            rank_right = ' ' + DISPLAY_RANKS[RANKS.index(self.rank)]
+            rank_left = DISPLAY_RANKS[self.rank] + ' '
+            rank_right = ' ' + DISPLAY_RANKS[self.rank]
         else:
-            rank_left = rank_right = DISPLAY_RANKS[RANKS.index(self.rank)]
-        suit_center = ' ' + self.suit + ' '
+            rank_left = rank_right = DISPLAY_RANKS[self.rank]
+        suit_center = ' ' + DISPLAY_SUITS[self.suit] + ' '
         
         card = []
-        for row in self.face_up_temp:
-            card.append(row.replace('♠KK', self.suit + rank_left).replace('KK♠', rank_right + self.suit).replace(' ♠ ', suit_center))
+        for row in self.card_temp:
+            card.append(row.replace('♠KK', DISPLAY_SUITS[self.suit] + rank_left).replace('KK♠', rank_right + DISPLAY_SUITS[self.suit]).replace(' ♠ ', suit_center))
         self.dot_matrix = card
         return self.dot_matrix
 
@@ -87,15 +96,98 @@ class Card:
         suit_order = ['D', 'C', 'H', 'S']
         return suit_order.index(self.suit)
 
-class Player:
-    def __init__(self, name, is_human=False):
-        self.name = name
-        self.is_human = is_human
+class Pile:
+    def __init__(self):
         self.cards = []
+    
+    def __repr__(self) -> str:
+        return (', '.join([str(card) for card in self.cards]))
+    
+    def __iter__(self):
+        return iter(self.cards)
+    
+    def __len__(self):
+        return len(self.cards)
+
+    def add_card(self, card: Card):
+        self.cards.append(card)
     
     def sort_cards(self):
         # 按点数和花色排序
         self.cards.sort(key=lambda card: (card.get_rank_value(), card.get_suit_value()))
+    
+    def __getitem__(self, index):
+        return self.cards[index]
+
+    def remove(self, card):
+        self.cards.remove(card)
+
+    def clear_selection(self):
+        for card in self.cards:
+            card.set_selected(False)
+
+    def select_cards(self, selected_cards):
+        for card in selected_cards:
+            self.cards[self.cards.index(card)].set_selected(True)
+
+    def get_selected_cards(self):
+        return [card for card in self.cards if card.is_selected]
+    
+    def show_cards(self, direction='horizontal', compact=False):
+        all_cards = []
+        if direction == 'horizontal':
+            for r in range(8): # each card span 7+1 rows, extract 1 row for selected cards to pop up
+                concated_row = ''
+                size = len(self.cards)
+                for index, card in enumerate(self.cards):
+                    arr = card.get_dot_matrix().copy()
+                    if card.is_selected:
+                        arr.append(' ' * 9)
+                    else:
+                        arr.insert(0, ' ' * 9)
+                    if compact and index < size - 1:
+                        for i in range(len(arr)):
+                            if card.rank == '10':
+                                arr[i] = arr[i][:4]
+                            else:
+                                arr[i] = arr[i][:3]
+                    concated_row += card.render_card_row(arr[r]) ## + (' ' if not compact else '')
+                all_cards.append(concated_row)
+        else:
+            pile_size = len(self.cards)
+            for index, card in enumerate(self.cards):
+                arr = card.get_dot_matrix().copy()
+                if card.is_selected:
+                    arr.append(' ' * 9)
+                    arr.append(' ' * 9)
+                else:
+                    arr.insert(0, ' ' * 9)
+                    arr.insert(0, ' ' * 9)
+                if index == pile_size - 1:
+                    # last card
+                    if card.face_up:
+                        all_cards.extend([card.render_card_row(row) for row in arr])
+                    else:
+                        all_cards.extend([card.render_card_row(row) for row in Card.face_down_card_temp])
+                else:
+                    if card.face_up:
+                        all_cards.extend([card.render_card_row(row) for row in arr[:2]])
+                    else:
+                        all_cards.extend([card.render_card_row(row) for row in [
+                            "╭───────╮",
+                            "│░░░░░░░│"
+                        ]])
+        return all_cards
+
+class Player:
+    def __init__(self, name, is_human=False):
+        self.name = name
+        self.is_human = is_human
+        self.cards = Pile()
+    
+    def __repr__(self) -> str:
+        self.cards.sort_cards()
+        return self.name + ": " + str(self.cards)
     
     def has_diamond_3(self):
         return any(card.suit == 'D' and card.rank == '3' for card in self.cards)
@@ -103,7 +195,7 @@ class Player:
     def play_card(self, cards):
         for card in cards:
             self.cards.remove(card)
-        # self.sort_cards()
+
 
 class Game:
     def __init__(self):
@@ -124,9 +216,9 @@ class Game:
         deck = self.initialize_deck()
         for i in range(13):
             for player in self.players:
-                player.cards.append(deck.pop())
+                player.cards.add_card(deck.pop())
         for player in self.players:
-            player.sort_cards()
+            player.cards.sort_cards()
     
     def find_first_player(self):
         for i, player in enumerate(self.players):
@@ -152,12 +244,12 @@ class Game:
             # 检查顺子
             if Game.is_straight(cards):
                 # 检查同花顺
-                if all(card.suit == cards[0].suit for card in cards):
+                if Game.is_same_suit(cards):
                     return '同花顺'
                 else:
                     return '顺子'
             # 检查同花
-            elif all(card.suit == cards[0].suit for card in cards):
+            elif Game.is_same_suit(cards):
                 return '同花'
             # 检查三个带一对
             elif Game.is_three_with_pair(cards):
@@ -178,7 +270,7 @@ class Game:
         ranks = sorted([card.get_rank_value() for card in cards])
         
         # 检查连续, 且数字不重复
-        if ranks == list(range(ranks[0], ranks[0]+5)):
+        if ranks == list(range(ranks[0], ranks[0]+5)): #加5超出12的组合一定不会匹配
             # 排除J-Q-K-A-2 (8,9,10,11,12)
             if ranks != [8, 9, 10, 11, 12]:
                 return True
@@ -188,8 +280,13 @@ class Game:
         if ranks == [0, 1, 2, 11, 12]:
             return True
         # 2-3-4-5-6 (12,0,1,2,3) -> 排序后 [0,1,2,3,12], 不连续, 不合法, False
+        # K-A-2-3-4, Q-K-A-2-3 也是排序后不连续, 自然排除
         return False
-        
+
+    @staticmethod
+    def is_same_suit(cards):
+        return all(card.suit == cards[0].suit for card in cards)
+    
     @staticmethod
     def is_three_with_pair(cards): #葫芦, 三个带一对
         rank_counts = {}
@@ -207,6 +304,24 @@ class Game:
         return counts == [4, 1] #五张牌中, 只有两种数字, 并且一种数字出现四次, 另一种数字出现一次
     
     @staticmethod
+    def compare_card_by_rank_then_suit(cards1, cards2):
+        assert len(cards1)==len(cards2)
+
+        # unpack rank and suit and sort the cards
+        rank_and_suit1 = sorted([(card.get_rank_value(), card.get_suit_value()) for card in cards1], reverse=True)
+        rank_and_suit2 = sorted([(card.get_rank_value(), card.get_suit_value()) for card in cards2], reverse=True)
+
+        # 逐个牌比数字大小
+        for index in range(len(rank_and_suit1)):
+            if rank_and_suit1[index][0] == rank_and_suit2[index][0]:
+                continue
+            else:
+                return rank_and_suit1[index][0] > rank_and_suit2[index][0]
+
+        # 数字大小比不出, 说明全数字一模一样, 比最大的花色
+        return rank_and_suit1[index][1] > rank_and_suit2[index][1]
+
+    @staticmethod
     def compare_cards(cards1, cards2):
         type1 = Game.determine_card_type(cards1)
         type2 = Game.determine_card_type(cards2)
@@ -217,12 +332,8 @@ class Game:
         
         # 同类型比较, 原则是先比数字, 再比花色
         if type1 in ('单张', '对子', '三个'):#数字都一样
-            if cards1[0].get_rank_value() > cards2[0].get_rank_value(): # 先比数字
-                return True #三个牌型在此阶段一定能分出大小, 因为一副牌里同一数字总共才四张牌
-            elif cards1[0].get_rank_value() == cards2[0].get_rank_value(): # 数字相同时比花色
-                if max([c1.get_suit_value() for c1 in cards1]) > max([c2.get_suit_value() for c2 in cards2]):
-                    return True
-            return False
+            #综合来看, 也是符合这个原则: 先由大到小逐个比较数字, 再比较大/次大/第三大/第四大/第五大等一一对应的花色
+            return Game.compare_card_by_rank_then_suit(cards1, cards2)
         elif type1 in ('顺子', '同花顺'):
             # 取最大牌点（2在顺子中视为小牌）
             ranks1 = sorted([card.get_rank_value() for card in cards1])
@@ -234,28 +345,21 @@ class Game:
             else:
                 max_rank1 = max(ranks1)
             if ranks2 == [0, 1, 2, 11, 12]:
-                max_rank2 = 2
+                max_rank2 = 2 #数字牌5
             else:
                 max_rank2 = max(ranks2)
             if max_rank1 > max_rank2:
                 return True
             else:
-                #最大数一样时, 比这张牌的花色, 只有一个牌, 因为顺子没有重复数字
+                # 最大数一样时(因为是顺子, 后续是逐个-1, 最大比不出大小则后面也也一定比不出, 不用再就数字的大小来比较),
+                # 比同样数字的两张牌的花色, 因为每种花色只有一个牌, 而且因为顺子没有重复数字, 所以直接取过滤后的第一个元素
+                # 花色一定不同, 一定可比出大小
                 suit_of_max_rank_card1 = [c1.get_suit_value() for c1 in cards1 if c1.get_rank_value() == max_rank1][0]
                 suit_of_max_rank_card2 = [c2.get_suit_value() for c2 in cards2 if c2.get_rank_value() == max_rank2][0]
                 return suit_of_max_rank_card1 > suit_of_max_rank_card2
         elif type1 == '同花':
-            # 也是先比数字, 再比最大数的花色
-            max_rank1 = max(card.get_rank_value() for card in cards1)
-            max_rank2 = max(card.get_rank_value() for card in cards2)
-            #比最大数
-            if max_rank1 > max_rank2:
-                return True
-            else:
-                #最大数一样时, 比这张牌的花色, 有可能多张牌
-                suit_of_max_rank_card1 = max([c1.get_suit_value() for c1 in cards1 if c1.get_rank_value() == max_rank1])
-                suit_of_max_rank_card2 = max([c2.get_suit_value() for c2 in cards2 if c2.get_rank_value() == max_rank2])
-                return suit_of_max_rank_card1 > suit_of_max_rank_card2
+            #综合来看, 也是符合这个原则: 先由大到小逐个比较数字, 再比较大/次大/第三大/第四大/第五大等一一对应的花色
+            return Game.compare_card_by_rank_then_suit(cards1, cards2)
         elif type1 == '三个带一对':
             # 比较三个的大小
             rank_counts1 = {}
@@ -264,6 +368,7 @@ class Game:
             rank_counts2 = {}
             for card in cards2:
                 rank_counts2[card.rank] = rank_counts2.get(card.rank, 0) + 1
+            # 数字大小一定不一样, 不会需要比较到那一对
             rank1 = [rank for rank, count in rank_counts1.items() if count == 3][0]
             rank2 = [rank for rank, count in rank_counts2.items() if count == 3][0]
             temp_card1 = Card('S', rank1)
@@ -277,6 +382,7 @@ class Game:
             rank_counts2 = {}
             for card in cards2:
                 rank_counts2[card.rank] = rank_counts2.get(card.rank, 0) + 1
+            # 数字大小一定不一样, 不会需要比较到单个
             rank1 = [rank for rank, count in rank_counts1.items() if count == 4][0]
             rank2 = [rank for rank, count in rank_counts2.items() if count == 4][0]
             temp_card1 = Card('S', rank1)
@@ -380,7 +486,7 @@ class Game:
         else:
             strongest_moves.sort(key=lambda x: self.get_move_strength(x), reverse=True)
             return strongest_moves[0]
-        
+    
     @staticmethod
     def get_move_strength(move):
         move = list(move)
@@ -410,7 +516,11 @@ class Game:
             four_rank = [rank for rank, count in rank_counts.items() if count == 4][0]
             return Card('S', four_rank).get_rank_value() * 1000000
         return 0
-    
+
+    def print_player_cards(self):
+        for player in self.players:
+            print(str(player))
+
     def play(self):
         self.deal_cards()
         self.current_player_index = self.find_first_player()
@@ -448,11 +558,11 @@ class Game:
                                 break
                             elif 1 <= choice <= len(valid_moves):
                                 chosen_move = valid_moves[choice-1]
-                                print(f"你出了: {chosen_move} ({self.determine_card_type(chosen_move)})")
                                 current_player.play_card(chosen_move)
                                 self.last_cards = chosen_move
                                 self.last_player_index = self.current_player_index
                                 self.pass_count = 0
+                                print(f"你出了: {chosen_move} ({self.determine_card_type(chosen_move)}), 剩余{len(current_player.cards)}张牌")
                                 break
                             else:
                                 print("输入无效，请重新输入")
@@ -467,11 +577,11 @@ class Game:
                     valid_moves = self.get_valid_moves(current_player, self.last_cards)
                     if valid_moves:
                         chosen_move = self.ai_choose_move(current_player, self.last_cards)
-                        print(f"{current_player.name} 出了: {chosen_move} ({self.determine_card_type(chosen_move)})")
                         current_player.play_card(chosen_move)
                         self.last_cards = chosen_move
                         self.last_player_index = self.current_player_index
                         self.pass_count = 0
+                        print(f"{current_player.name} 出了: {chosen_move} ({self.determine_card_type(chosen_move)}), 剩余{len(current_player.cards)}张牌")
                     else:
                         print(f"{current_player.name} 没有可出的牌")
                         self.pass_count += 1
@@ -481,15 +591,15 @@ class Game:
                         print(f"{current_player.name} Pass")
                         self.pass_count += 1
                     else:
-                        print(f"{current_player.name} 出了: {chosen_move} ({self.determine_card_type(chosen_move)})")
                         current_player.play_card(chosen_move)
                         self.last_cards = chosen_move
                         self.last_player_index = self.current_player_index
                         self.pass_count = 0
+                        print(f"{current_player.name} 出了: {chosen_move} ({self.determine_card_type(chosen_move)}), 剩余{len(current_player.cards)}张牌")
             
             # 检查是否有人出完牌
             if not current_player.cards:
-                print(f"\n{current_player.name} 获胜！")
+                print(f"\n{RED if current_player.is_human else BLUE}❉⊱•❉⊱• {current_player.name} 获胜！•⊰❉•⊰❉{RESET}")
                 break
             
             # 检查是否需要重新开始
@@ -502,13 +612,17 @@ class Game:
             # 下一个玩家
             self.current_player_index = (self.current_player_index + 1) % 4
         
-        print("=== 游戏结束 ===")
+        print("\n=== 游戏结束 ===")
+        print("各玩家剩余牌:")
+        for player in self.players:
+            if player.cards:
+                print(GREEN + str(player) + RESET)
 
 if __name__ == "__main__":
     while True:
         game = Game()
         game.play()
-        resp = input("再玩一局？(y,[回车]/n):").strip()
+        resp = input("再玩一局？(y/[回车] || n):").strip()
         if resp.lower() != "y" and resp != "":
             print("谢谢参与！")
             break
