@@ -2,6 +2,8 @@ import random
 import re
 import os
 import time
+import threading
+from playsound3 import playsound
 
 DISPLAY_SUITS = {'S': '♠', 'H': '♥', 'C': '♣', 'D': '♦'}
 DISPLAY_RANKS = {'A':'𝐀', '2':'𝟮', '3':'𝟯', '4':'𝟰', '5':'𝟱', '6':'𝟲',
@@ -17,6 +19,32 @@ RESET = "\033[0m"
 
 # https://baijiahao.baidu.com/s?id=1835199996633113121
 # https://mbd.baidu.com/newspage/data/dtlandingsuper?nid=dt_3988709418184650235
+
+
+class LoopPlayer(threading.Thread):
+    def __init__(self):
+        super().__init__()
+        self.sound_file = r'./sound/background.mp3'
+        self.sound_handle = None
+        self.is_stop = False
+        
+    def run(self):
+        self.sound_handle = playsound(self.sound_file, block=False)
+        start_time = time.time()
+        while not self.is_stop:
+            if time.time() - start_time >= 32: # whole sound duration
+                # loop the sound
+                self.sound_handle.stop()
+                self.sound_handle = playsound(self.sound_file, block=False)
+                start_time = time.time()
+            time.sleep(1)
+        self.sound_handle.stop()
+    
+    def stop(self):
+        self.is_stop = True
+
+background_player = None
+one_time_player = None
 
 class Card:
     
@@ -861,14 +889,39 @@ class Game:
         self.display() # 刷新界面
         
 if __name__ == "__main__":
-    last_winner = -1
-    while True:
-        game = Game(last_winner)
-        game.play()
-        last_winner = game.last_player_index
+    try:
+        background_player = LoopPlayer()
+        background_player.start()
 
-        resp = input("再玩一局？(y/[回车] || n):").strip()
-        if resp.lower() != "y" and resp != "":
-            print("谢谢参与！")
-            break
-    print("感谢游玩, 再见!")
+        last_winner = -1
+        while True:
+            if isinstance(background_player, LoopPlayer):
+                background_player.stop()
+            # restart
+            background_player = LoopPlayer()
+            background_player.start()
+            
+            game = Game(last_winner)
+            game.play()
+            last_winner = game.last_player_index
+            
+            background_player.stop()
+            if last_winner == 0:
+                one_time_player = playsound('./sound/win.mp3', block=False)
+            else:
+                one_time_player = playsound('./sound/lose.mp3', block=False)
+
+            resp = input("再玩一局？(y/[回车] || n):").strip()
+            if resp.lower() != "y" and resp != "":
+                print("谢谢参与！")
+                break
+            one_time_player.stop()
+            one_time_player = None
+        print("感谢游玩, 再见!")
+    except Exception:
+        pass
+    finally:
+        if background_player:
+            background_player.stop()
+        if one_time_player:
+            one_time_player.stop()
