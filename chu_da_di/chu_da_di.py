@@ -15,6 +15,7 @@ BLUE = "\033[94m"
 YELLOW = "\033[93m"
 RED = "\033[91m"
 GREEN = "\033[92m"
+MAGENTA = "\033[95m"
 RESET = "\033[0m"
 
 # https://baijiahao.baidu.com/s?id=1835199996633113121
@@ -87,6 +88,16 @@ class Card:
     def set_face_up(self, face_up: bool):
         self.face_up = face_up
 
+    def get_rank_value(self):
+        # 2最大，3最小
+        rank_order = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2']
+        return rank_order.index(self.rank)
+    
+    def get_suit_value(self):
+        # 黑桃>红桃>梅花>方块
+        suit_order = ['D', 'C', 'H', 'S']
+        return suit_order.index(self.suit)
+
     def get_dot_matrix(self):
         if self.dot_matrix is not None:
             return self.dot_matrix
@@ -118,16 +129,6 @@ class Card:
                 rendered_str += ch
         return rendered_str
     
-    def get_rank_value(self):
-        # 2最大，3最小
-        rank_order = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2']
-        return rank_order.index(self.rank)
-    
-    def get_suit_value(self):
-        # 黑桃>红桃>梅花>方块
-        suit_order = ['D', 'C', 'H', 'S']
-        return suit_order.index(self.suit)
-
 class Pile:
     def __init__(self):
         self.cards = []
@@ -188,7 +189,6 @@ class Pile:
         for card in self.cards:
             card.set_face_up(False)
 
-
     def show_cards(self, direction='horizontal', compact=False):
         all_cards = []
         if direction == 'horizontal':
@@ -248,7 +248,6 @@ class Player:
     def play_card(self, cards):
         for card in cards:
             self.cards.remove(card)
-
 
 class Game:
     def __init__(self, last_winner=-1):
@@ -408,8 +407,8 @@ class Game:
                 max_rank2 = 2 #数字牌5
             else:
                 max_rank2 = max(ranks2)
-            if max_rank1 > max_rank2:
-                return True
+            if max_rank1 != max_rank2:
+                return max_rank1 > max_rank2
             else:
                 # 最大数一样时(因为是顺子, 后续是逐个-1, 最大比不出大小则后面也也一定比不出, 不用再就数字的大小来比较),
                 # 比同样数字的两张牌的花色, 因为每种花色只有一个牌, 而且因为顺子没有重复数字, 所以直接取过滤后的第一个元素
