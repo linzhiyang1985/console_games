@@ -923,6 +923,8 @@ if __name__ == "__main__":
         print("感谢游玩, 再见!")
     except Exception:
         pass
+    except KeyboardInterrupt:
+        pass
     finally:
         if background_player:
             background_player.stop()
