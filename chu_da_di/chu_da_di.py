@@ -748,10 +748,19 @@ class Game:
             for index, row in enumerate(all_rows):
                 centered_row = self.center_just(row, 118) ## 9 + 100 + 9
                 if index == len(all_rows) - 1:
-                    left_replace = re.findall(r' {20}\S', centered_row)[0]
-                    right_replace = re.findall(r'\S {20}', centered_row)[0]
-                    centered_row = centered_row.replace(left_replace, ('[' +player.name+']' if is_current_player else player.name).rjust(16) + '  ' + left_replace[-1]) \
-                                               .replace(right_replace, right_replace[0]  + '  ' + f'剩余{len(player.cards)}张牌'.ljust(16))
+                    left_matches = re.findall(r' {20}\S', centered_row)
+                    if left_matches:
+                        left_replace = left_matches[0]
+                        right_replace = re.findall(r'\S {20}', centered_row)[0]
+                        centered_row = centered_row.replace(left_replace, ('[' +player.name+']' if is_current_player else player.name).rjust(16) + '  ' + left_replace[-1]) \
+                                                .replace(right_replace, right_replace[0]  + '  ' + f'剩余{len(player.cards)}张牌'.ljust(16))
+                    else:
+                        ## 属于selected的卡, 最后一行空行, 用于突出来
+                        centered_row = self.center_just(
+                            ('[' +player.name+']' if is_current_player else player.name).rjust(16) + '  ' \
+                                + row + \
+                            '  ' + f'剩余{len(player.cards)}张牌'.ljust(16)
+                            , 118) ## 9 + 100 + 9
 
                 print(centered_row)
         else:
