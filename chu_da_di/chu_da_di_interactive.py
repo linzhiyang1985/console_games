@@ -232,76 +232,42 @@ class Pile:
                             each_card_starts_at_col.append(each_card_starts_at_col[-1] + len(cropped_row))
                 # 联结+渲染
                 all_cards[row_index] = ''.join([self.cards[card_index].render_card_row(segment) for card_index, segment in enumerate(concated_segments)])
-            
-            # 构建第一行
-            concated_segments = []
-            row_str = ''
-            for index, card in enumerate(self.cards):
-                full_first_row = card.get_dot_matrix()[0]
-                if not compact:
-                    concated_segments.append(' ' * 9)
-                else:
-                    if not card.is_selected:
-                        if len(row_str) < each_card_starts_at_col[index+1]:
-                            compensate_str = ' ' * (each_card_starts_at_col[index+1] - len(row_str))
-                            concated_segments.append(compensate_str) # 补全没被挡住的部分
-                            row_str += compensate_str
-                        else:
-                            concated_segments.append('') # 不显示, 全挡住, 但是要占位
-                    else:
-                        if len(row_str) > each_card_starts_at_col[index]:
-                            # 前面的牌显示太多了, 要修正
-                            crop_size = len(row_str) - each_card_starts_at_col[index]
-                            for seg_index in range(len(concated_segments)-1, -1, -1):
-                                if concated_segments[seg_index] != '':
-                                    str_len = len(concated_segments[seg_index])
-                                    if str_len < crop_size:
-                                        concated_segments[seg_index] = ''
-                                        crop_size -= str_len
-                                    else:
-                                        concated_segments[seg_index] = concated_segments[seg_index][:str_len - crop_size]
-                                        break
-                            row_str = row_str[:-1*crop_size]
-                        # 将当前牌加进去
-                        concated_segments.append(full_first_row) # 完全延伸过去, 直到被另一张selected的牌挡住
-                        row_str += full_first_row
-            # 联结+渲染
-            all_cards[0] = ''.join([self.cards[card_index].render_card_row(segment) for card_index, segment in enumerate(concated_segments)])
 
-            # 构建最后一行
-            concated_segments = []
-            row_str = ''
-            for index, card in enumerate(self.cards):
-                full_last_row = card.get_dot_matrix()[-1]
-                if not compact:
-                    concated_segments.append(full_last_row)
-                else:
-                    if card.is_selected:
-                        if len(row_str) < each_card_starts_at_col[index+1]:
-                            compensate_str = ' ' * (each_card_starts_at_col[index+1] - len(row_str))
-                            concated_segments.append(compensate_str) # 补全没被挡住的部分
-                            row_str += compensate_str
-                        else:
-                            concated_segments.append('') # 不显示, 全挡住, 但是要占位
+            # 构建第一行/最后一行
+            for row_index in (0, -1):
+                concated_segments = []
+                row_str = ''
+                for index, card in enumerate(self.cards):
+                    full_row = card.get_dot_matrix()[row_index]
+                    if not compact:
+                        concated_segments.append(' ' * 9 if row_index == 0 else full_row)
                     else:
-                        if len(row_str) > each_card_starts_at_col[index]:
-                            # 前面的牌显示太多了, 要修正
-                            crop_size = len(row_str) - each_card_starts_at_col[index]
-                            for seg_index in range(len(concated_segments)-1, -1, -1):
-                                if concated_segments[seg_index] != '':
-                                    str_len = len(concated_segments[seg_index])
-                                    if str_len < crop_size:
-                                        concated_segments[seg_index] = ''
-                                        crop_size -= str_len
-                                    else:
-                                        concated_segments[seg_index] = concated_segments[seg_index][:str_len - crop_size]
-                                        break
-                            row_str = row_str[:-1*crop_size]
-                        # 将当前牌加进去
-                        concated_segments.append(full_last_row) # 完全延伸过去, 直到被另一张selected的牌挡住
-                        row_str += full_last_row
-            # 联结+渲染
-            all_cards[7] = ''.join([self.cards[card_index].render_card_row(segment) for card_index, segment in enumerate(concated_segments)])
+                        if (row_index == 0 and not card.is_selected) or (row_index == -1 and card.is_selected):
+                            if len(row_str) < each_card_starts_at_col[index+1]:
+                                compensate_str = ' ' * (each_card_starts_at_col[index+1] - len(row_str))
+                                concated_segments.append(compensate_str) # 补全没被挡住的部分
+                                row_str += compensate_str
+                            else:
+                                concated_segments.append('') # 不显示, 全挡住, 但是要占位
+                        else:
+                            if len(row_str) > each_card_starts_at_col[index]:
+                                # 前面的牌显示太多了, 要修正
+                                crop_size = len(row_str) - each_card_starts_at_col[index]
+                                for seg_index in range(len(concated_segments)-1, -1, -1):
+                                    if concated_segments[seg_index] != '':
+                                        str_len = len(concated_segments[seg_index])
+                                        if str_len < crop_size:
+                                            concated_segments[seg_index] = ''
+                                            crop_size -= str_len
+                                        else:
+                                            concated_segments[seg_index] = concated_segments[seg_index][:str_len - crop_size]
+                                            break
+                                row_str = row_str[:-1*crop_size]
+                            # 将当前牌加进去
+                            concated_segments.append(full_row) # 完全延伸过去, 直到被另一张selected的牌挡住
+                            row_str += full_row
+                # 联结+渲染
+                all_cards[row_index] = ''.join([self.cards[card_index].render_card_row(segment) for card_index, segment in enumerate(concated_segments)])
         else:
             all_cards = []
             pile_size = len(self.cards)
