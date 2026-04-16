@@ -867,14 +867,18 @@ class Game:
                         break
                     else:
                         key = None
-                        print("\r输入无效，请重试:", end="")
+                        print("输入无效，请重试:", end="")
             
             # process input
             if key == 'pass':
-                # 离开前重置样式
-                cards.clear_highlight()
-                cards.clear_selection()
-                return []
+                if not must_play:
+                    # 离开前重置样式
+                    cards.clear_highlight()
+                    cards.clear_selection()
+                    return []
+                else:
+                    print("不能不出牌, 请重新输入")
+                    continue
             if key == 'left':
                 cards.clear_highlight()
                 highlight_index = (highlight_index + length - 1) % length
@@ -894,9 +898,13 @@ class Game:
             elif key == 'play':
                 selected_cards = cards.get_selected_cards()
                 if selected_cards == []:
-                    # 离开前重置样式
-                    cards.clear_highlight()
-                    return []
+                    if not must_play:
+                        # 离开前重置样式
+                        cards.clear_highlight()
+                        return []
+                    else:
+                        print("不能不出牌, 请重新输入")
+                        continue
                 else:
                     # 检查选中的牌是否合法
                     check_valid = False
