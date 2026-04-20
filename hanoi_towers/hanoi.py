@@ -1,7 +1,10 @@
 import os
 import time
 import msvcrt
+import shutil
 from playsound3 import playsound
+
+IS_WINDOWS = os.name == 'nt'
 
 class Hanoi:
     COLORS = (
@@ -14,6 +17,13 @@ class Hanoi:
         '\033[95m', #BRIGHT_MAGENTA_FG
         '\033[96m', #BRIGHT_CYAN_FG
         '\033[97m', #WHITE_FG
+        '\033[31m', #DARK_RED_FG
+        '\033[32m', #DARK_GREEN_FG
+        '\033[33m', #DARK_YELLOW_FG
+        '\033[34m', #DARK_BLUE_FG
+        '\033[35m', #DARK_MAGENTA_FG
+        '\033[36m', #DARK_CYAN_FG
+        '\033[37m', #DARK_WHITE_FG
     )
     def __init__(self, n):
         self.n = n
@@ -22,11 +32,27 @@ class Hanoi:
         self.current_step = -1
         for i in range(n, 0, -1):
             self.pegs[0].append(i)
+        self.prohibit_sound = False
+    
+    def move_cursor(self, row: int, column: int):
+        """移动光标到指定位置"""
+        if IS_WINDOWS:
+            msvcrt.putch(b'\x1b')
+            msvcrt.putch(b'[')
+            for r in f"{row}":
+                msvcrt.putch(r.encode())
+            msvcrt.putch(b';')
+            for c in f"{column}":
+                msvcrt.putch(c.encode())
+            msvcrt.putch(b'H')
+        else:
+            curses.move(row, column)
     
     def play_disk(self, disk):
-        sound_files = ('', 'DO_1.mp3', 'RE_2.mp3','MI_3.mp3','FA_4.mp3','SO_5.mp3','LA_6.mp3','XI_7.mp3','do_8.mp3')
-        playsound('./sound/' + sound_files[disk], False)
-
+        if self.prohibit_sound:
+            return
+        sound_files = ('DO_1.mp3', 'RE_2.mp3','MI_3.mp3','FA_4.mp3','SO_5.mp3','LA_6.mp3','XI_7.mp3','do_8.mp3')
+        playsound('./sound/' + sound_files[(disk-1)%len(sound_files)], False)
 
     def move(self, from_peg, to_peg):
         if not self.pegs[from_peg]:
@@ -89,13 +115,23 @@ class Hanoi:
         self.pegs = [list(peg) for peg in state['pegs']]
         self.current_step = state['current_step']
 
-    def display(self, is_animate=False):
-        os.system('cls' if os.name == 'nt' else 'clear')
-        max_disk = self.n
+    def draw_title(self, is_animate=False):
+        self.move_cursor(0, 0)
         print(f"\n{'=' * 50}")
-        print(f"  汉诺塔演示 - 第 {self.current_step + 1}/{len(self.history)} 步" +(" - 自动播放中q停止" if is_animate else ""))
+        print(f"  汉诺塔演示 - 第 {self.current_step + 1}/{len(self.history)} 步" + (" - 自动播放中q停止" if is_animate else " "*30))
         print(f"{'=' * 50}\n")
+    
+    def update_step_in_title(self, is_animate=True):
+        self.move_cursor(3, 0)
+        print(f"  汉诺塔演示 - 第 {self.current_step + 1}/{len(self.history)} 步" +(" - 自动播放中q停止" if is_animate else " "*30))
+
+    def clear(self):
+        os.system('cls' if os.name == 'nt' else 'clear')
+    
+    def display_pegs(self):
+        self.move_cursor(6, 0)
         pivot_of_pegs = []
+        max_disk = self.n
         for level in range(max_disk, -1, -1):
             line = ""
             peg_segments = []
@@ -123,14 +159,42 @@ class Hanoi:
                     pivot_of_pegs.append(len(segment)//2)
                 index_of_separator = segment.index("|")
                 # add color effect
-                segment = self.COLORS[disk] + segment[:index_of_separator] + self.COLORS[0] +\
+                segment = self.COLORS[(disk+1)%len(self.COLORS)] + segment[:index_of_separator] + self.COLORS[0] +\
                             segment[index_of_separator:index_of_separator + 3] + \
-                            self.COLORS[disk] + segment[index_of_separator + 3:] + self.COLORS[0]
+                            self.COLORS[(disk+1)%len(self.COLORS)] + segment[index_of_separator + 3:] + self.COLORS[0]
                 peg_segments.append(segment)
             line = ''.join(peg_segments)
             print(line)
         print(" " * pivot_of_pegs[0] + "A" + " " * (pivot_of_pegs[0] + pivot_of_pegs[1]) + "B" + " " * (pivot_of_pegs[1] + pivot_of_pegs[2]) + "C")
         print()
+
+    def display(self, is_animate=False):
+        self.update_step_in_title(is_animate)
+        self.display_pegs()
+
+    def display_control_tips(self):
+        self.move_cursor(5 + self.n + 2 + 3, 0)
+        print("\n命令说明:")
+        print("n/→ - 下一步")
+        print("b/← - 上一步(回退)")
+        print("gNum - 跳转到第Num步")
+        print("a - 自动播放动画")
+        print("r - 重新开始")
+        print("q - 退出")
+        print()
+    
+    def clear_control_tips(self):
+        self.move_cursor(5 + self.n + 2 + 3, 0)
+        [print(' '*30) for _ in range(8)]
+    
+    def display_message(self, message):
+        self.clear_message()
+        self.move_cursor(5 + self.n + 2 + 2, 0)
+        print(message, end='')
+    
+    def clear_message(self):
+        self.move_cursor(5 + self.n + 2 + 2, 0)
+        print('\r'+ ' '*shutil.get_terminal_size().columns + '\r', end='')
 
     def play_animation(self, delay=0.5):
         self.display()
@@ -141,8 +205,6 @@ class Hanoi:
             if msvcrt.kbhit():
                 key = msvcrt.getch() # any key to stop animation
                 return
-
-#### Do、Re、Mi、Fa、Sol、La、Si
 
 def get_user_input():
     valid_key_and_cmd = {
@@ -181,9 +243,9 @@ def main():
     print("       欢迎使用汉诺塔演示程序")
     print("=" * 50)
     try:
-        n = int(input("\n请输入汉诺塔层数 (建议 1-8): "))
-        if n < 1 or n > 8:
-            print("层数必须在 1-8 之间")
+        n = int(input("\n请输入汉诺塔层数 (建议 1-9): "))
+        if n < 1 or n > 9:
+            print("层数必须在 1-9 之间")
             return
     except ValueError:
         print("输入无效，请输入数字")
@@ -191,16 +253,12 @@ def main():
 
     hanoi = Hanoi(n)
     hanoi.solve()
-    hanoi.display()
 
-    print("\n命令说明:")
-    print("  n/→ - 下一步")
-    print("  b/← - 上一步(回退)")
-    print("  gNum - 跳转到第Num步")
-    print("  a - 自动播放动画")
-    print("  r - 重新开始")
-    print("  q - 退出")
-    print()
+    hanoi.clear()
+    hanoi.draw_title(is_animate=False)
+    
+    hanoi.display()
+    hanoi.display_control_tips()
 
     while True:
         cmd, param = get_user_input()
@@ -208,20 +266,24 @@ def main():
             continue
 
         if cmd == 'quit':
-            print("感谢使用，再见！")
+            hanoi.clear_control_tips()
+            hanoi.display_message("感谢使用，再见！")
             break
         elif cmd == 'next':
             if hanoi.execute_step():
                 hanoi.display()
+                hanoi.clear_message()
             else:
-                print("已经到最后一步了！")
+                hanoi.display_message("已经到最后一步了！")
         elif cmd == 'back':
             if hanoi.goback():
                 hanoi.display()
+                hanoi.clear_message()
             else:
-                print("已经回到初始状态了！")
+                hanoi.display_message("已经回到初始状态了！")
         elif cmd == 'goto':
             try:
+                hanoi.prohibit_sound = True
                 target = int(param)
                 saved_state = hanoi.get_state()
                 hanoi.set_state({'pegs': [[], [], []], 'current_step': -1})
@@ -233,11 +295,16 @@ def main():
                     hanoi.display()
                 else:
                     hanoi.set_state(saved_state)
-                    print(f"步骤无效，有效范围 1-{len(hanoi.history)}")
+                    hanoi.display_message(f"步骤无效，有效范围 1-{len(hanoi.history)}")
             except (IndexError, ValueError):
-                print("请输入有效的步骤号")
+                hanoi.display_message("请输入有效的步骤号")
+            finally:
+                hanoi.prohibit_sound = False
         elif cmd == 'animation':
-            delay = input("请输入每步延迟时间(秒，默认0.2): ")
+            hanoi.display_message("请输入每步延迟时间(秒，默认0.2): ")
+            delay = input()
+            hanoi.clear_message()
+
             try:
                 delay = float(delay) if delay else 0.2
             except ValueError:
@@ -246,9 +313,11 @@ def main():
         elif cmd == 'restart':
             hanoi = Hanoi(n)
             hanoi.solve()
+
+            hanoi.clear()
+            hanoi.draw_title(is_animate=False)
             hanoi.display()
-        else:
-            print("未知命令，请重新输入")
+            hanoi.display_control_tips()
 
 if __name__ == "__main__":
     main()
