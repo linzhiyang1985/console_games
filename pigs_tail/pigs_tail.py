@@ -240,6 +240,7 @@ class PigTailGame:
         self.current_player = 0
         self.card_pointer = 0
         self.draw_mode = 'deck' # 'deck' or 'hand'
+        self.hand_pointer = -1
         self.center_pile = []
         self.previous_suit = None
     
@@ -272,7 +273,7 @@ class PigTailGame:
             self.clear()
             self.display_deck()
 
-    def draw_card(self, index):
+    def draw_card_from_deck(self, index):
         if index < 0 or index >= len(self.deck):
             return None
         card = self.deck.pop(index)
@@ -288,6 +289,20 @@ class PigTailGame:
         deck_size = len(self.deck)
         self.card_pointer = (self.card_pointer + 1) % deck_size
     
+    def draw_card_from_hand(self, index):
+        if index < 0 or index >= len(self.players[self.current_player]):
+            return None
+        card = self.players[self.current_player][index]
+        self.players[self.current_player].remove_card(card)
+        self.draw_mode = 'deck'
+        return card
+    
+    def hand_pointer_move_backward(self):
+        self.hand_pointer = (self.hand_pointer - 1) % len(self.players[self.current_player])
+    
+    def hand_pointer_move_forward(self):
+        self.hand_pointer = (self.hand_pointer + 1) % len(self.players[self.current_player])
+
     def clear(self):
         os.system('cls')
     
@@ -306,13 +321,11 @@ class PigTailGame:
         else:
             curses.move(row, column)
     
+    def display_title_and_rule(self):
+        print(GREEN + ' ' * 22 + "===== 猪尾巴纸牌游戏 =====" + RESET)
+        print(GREEN + ' ' * 7 + "规则：抽牌比花色，花色相同则拿走所有牌，最后持牌少者获胜" + RESET)
+
     def display_deck(self):
-        self.clear()
-        self.display_title_and_rule()
-        print()
-
-        deck_arr = []
-
         # 以环形摊开牌组,以供选择
         p_upper = Pile(self.deck[0:13])
         p_right = Pile(self.deck[13:26])
@@ -321,14 +334,15 @@ class PigTailGame:
 
         rows_upper = p_upper.show_cards(direction='horizontal', compact=True)
         rows_right = p_right.show_cards(direction='vertical', compact=True)
-
         rows_lower = p_lower.show_cards(direction='horizontal', compact=True, reversed=True)
         rows_left = p_left.show_cards(direction='vertical', compact=True, reversed=True)
 
-        
         deck_row_index = 0
         temp_pile = Pile(self.center_pile[-8:]) # maximum show recent 8 cards
         center_card_arr = temp_pile.show_cards(direction='horizontal', compact=True)
+
+        # 组织牌组显示
+        deck_arr = []
         while deck_row_index < 35:
             if deck_row_index < 2:
                 deck_arr.append(rows_upper.pop(0))
@@ -371,6 +385,7 @@ class PigTailGame:
                 deck_arr.append(row)
             deck_row_index += 1
         
+        # 附加四周的pointer符号区域
         if self.deck:
             # calc suit symbol position
             ## upper
@@ -434,14 +449,62 @@ class PigTailGame:
             for row_index in range(len(deck_arr)):
                 deck_arr[row_index] = suit_row[row_index] + deck_arr[row_index]
 
+        # 正式打印
         for row in deck_arr:
             print(Card.render_card_row(row))
+
+    def display_hand(self):
+        print()
+        player = self.players[self.current_player]
+        if len(player) == 0:
+            self.draw_mode = 'deck'
+            print("当前玩家没有牌")
+        else:
+            print("选择出牌:", end='')
+            cards = str(player).split(', ')
+            prev_suit = None
+            for index, card in enumerate(cards):
+                if prev_suit != card[0]:
+                    print()
+                    prev_suit = card[0]
+                card_row = Card.render_card_row(card)
+                print(' ' + card_row + ' ' if self.hand_pointer != index else '[' + card_row + ']', end=' ')
+            print()
+
+    def display_player_stat(self):
+        print()
+        print(f"玩家 {self.current_player + 1} 的回合")
+        player_counts = []
+        for i, player in enumerate(self.players):
+            count = len(player)
+            player_counts.append(count)
+            print(f"玩家 {i + 1} 的手牌数量: {count}: {Card.render_card_row(repr(player))}")
+        return player_counts
     
+    def display_controls(self):
+        print()
+        print("按[回车]随机抽牌")
+        print("或[方向键],[n/p]选牌, [空格]抽取指定的牌")
+        print("按[x]切换抽牌模式 - 当前抽" + ("手牌" if self.draw_mode == 'hand' else "中心牌"))
+        print("按[q]退出游戏")
+    
+    def display(self):
+        self.clear()
+        self.display_title_and_rule()
+        print()
+        self.display_deck()
+        if self.draw_mode == 'hand':
+            self.display_hand()
+        self.display_player_stat()
+        self.display_controls()
+
+
     def get_user_input(self):
         accepted_keys_and_map = {
             b'K': 'left', b'M': 'right',
             b'H': 'up', b'P': 'down',
-            b'x': 'switch', # switch choosing cards between hand cards and center cards
+            b'n': 'next', b'p': 'prev',
+            b'x': 'switch_mode', # switch choosing cards between hand cards and center cards
             b' ': 'draw_target',
             b'\r': 'draw_random',
             b'q': 'quit',
@@ -454,40 +517,67 @@ class PigTailGame:
                     if key == b'\xe0':
                         key = msvcrt.getch()
                         if key in accepted_keys_and_map:
-                            key = accepted_keys_and_map[key]
+                            cmd = accepted_keys_and_map[key]
                     elif key in accepted_keys_and_map:
-                        key = accepted_keys_and_map[key]
+                        cmd = accepted_keys_and_map[key]
                 time.sleep(0.1)
             
             # process key
-            if key == 'right' or key == 'up':
-                self.card_pointer_move_forward()
-                self.display_deck()
-            elif key == 'left' or key == 'down':
-                self.card_pointer_move_backward()
-                self.display_deck()
-            elif key == 'draw_target':
-                return self.card_pointer
-            elif key == 'draw_random':
-                return random.randint(0, len(self.deck) - 1)
-            elif key == 'quit':
-                exit(0)
+            if cmd in ('next', 'prev'):
+                if cmd == 'next':
+                    self.card_pointer_move_forward()
+                elif cmd == 'prev':
+                    self.card_pointer_move_backward()
+                self.display()
+            elif cmd in ('up', 'down', 'left', 'right'):
+                if self.draw_mode == 'deck':
+                    if (0<=self.card_pointer<13 and cmd == 'right') or \
+                        (13<=self.card_pointer<26 and cmd == 'down') or \
+                        (26<=self.card_pointer<39 and cmd == 'left') or \
+                        (39<=self.card_pointer<52 and cmd == 'up'):
+                        self.card_pointer_move_forward()
+                    elif (0<=self.card_pointer<13 and cmd == 'left') or \
+                        (13<=self.card_pointer<26 and cmd == 'up') or \
+                        (26<=self.card_pointer<39 and cmd == 'right') or \
+                        (39<=self.card_pointer<52 and cmd == 'down'):
+                        self.card_pointer_move_backward()
+                    self.display()
+                else:
+                    # hand mode
+                    if cmd == 'left':
+                        self.hand_pointer_move_backward()
+                    elif cmd == 'right':
+                        self.hand_pointer_move_forward()
+                    self.display()
             else:
-                print("未知按键")
-    
+                if cmd == 'draw_target':
+                    if self.draw_mode == 'deck':
+                        return self.card_pointer
+                    else:
+                        return self.hand_pointer
+                elif cmd == 'draw_random':
+                    return random.randint(0, len(self.deck) - 1)
+                elif cmd == 'switch_mode':
+                    self.draw_mode = 'hand' if self.draw_mode == 'deck' else 'deck'
+                    self.hand_pointer = 0
+                    self.display()
+                elif cmd == 'quit':
+                    exit(0)
+                else:
+                    print("未知按键")
+
     def play_turn(self):
-        print(f"\n玩家 {self.current_player + 1} 的回合")
-        self.print_card_stat()
+        self.display()
         
-        print("按[Enter]随机抽牌")
-        print("或[方向键]选牌, [空格]抽取指定的牌")
-        print("按[x]切换抽取模式 - 当前从牌桌抽取")
         draw_index = self.get_user_input()
         
-        # card = self.draw_card(random.randint(0, len(self.deck) - 1))
-        card = self.draw_card(int(draw_index))
+        if self.draw_mode == 'deck':
+            card = self.draw_card_from_deck(int(draw_index))
+        else:
+            card = self.draw_card_from_hand(int(draw_index))
         if not card:
             return False
+        
         print(f"抽到的牌: {card}")
         current_suit = card.get_suit()
         
@@ -507,38 +597,28 @@ class PigTailGame:
         self.current_player = (self.current_player + 1) % len(self.players)
         return True
     
-    def display_title_and_rule(self):
-        print(GREEN + ' ' * 22 + "===== 猪尾巴纸牌游戏 =====" + RESET)
-        print(GREEN + ' ' * 7 + "规则：抽牌比花色，花色相同则拿走所有牌，最后持牌少者获胜" + RESET)
-
     def play_game(self):        
         while self.deck:
-            self.display_deck()
+            self.display()
             if not self.play_turn():
                 break
-        self.display_deck()
+        self.display()
         self.end_game()
     
-    def print_card_stat(self):
-        player_counts = []
-        for i, player in enumerate(self.players):
-            count = len(player)
-            player_counts.append(count)
-            print(f"玩家 {i + 1} 的手牌数量: {count}: {Card.render_card_row(repr(player))}")
-        return player_counts
     
     def end_game(self):
-        print("\n===== 游戏结束 =====")
-        print(f"牌桌上有 {len(self.center_pile)} 张牌")
-        player_counts = self.print_card_stat()
-        
+        print()
+        print("===== 游戏结束 =====")
+        print(f"牌桌上剩 {len(self.center_pile)} 张牌")
+        player_counts = [len(player) for player in self.players]
+        print()
         # 牌少者胜
         if player_counts[0] > player_counts[1]:
-            print(f"\n玩家 2 获胜！")
+            print(f"玩家 2 获胜！")
         elif player_counts[0] < player_counts[1]:
-            print(f"\n玩家 1 获胜！")
+            print(f"玩家 1 获胜！")
         else:
-            print(f"\n平局！玩家 1 和 2 手牌数量相同")
+            print(f"平局！玩家 1 和 2 手牌数量相同")
 
 if __name__ == "__main__":
     game = PigTailGame()
