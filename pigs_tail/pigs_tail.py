@@ -249,28 +249,25 @@ class PigTailGame:
         ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
         for suit in suits:
             for rank in ranks:
-                new_card = Card(suit, rank)
-                self.deck.append(new_card)
+                new_card = Card(suit, rank) # 默认正面
+                self.deck.append(new_card) # 一张张摊开扑克牌
                 if animate:
-                    self.clear()
-                    self.display_deck()
+                    self.display() # 每多一张牌刷新界面
                     time.sleep(0.2)
         
         # shuffle 5 times
         for _ in range(5):
-            random.shuffle(self.deck)
+            random.shuffle(self.deck) # 洗牌
             if animate:
-                self.clear()
-                self.display_deck()
+                self.display() # 洗牌之后显示正面
                 time.sleep(0.2)
-                [card.set_face_up(False) for card in self.deck]
-                self.clear()
-                self.display_deck()
+                [card.set_face_up(False) for card in self.deck] # 设置翻转背面
+                self.display() # 翻转背面之后显示
                 time.sleep(0.2)
-                [card.set_face_up(True) for card in self.deck]
-        if animate:
-            [card.set_face_up(False) for card in self.deck]
-            self.display()
+                [card.set_face_up(True) for card in self.deck] # 设置翻转正面, 准备下一次洗牌
+
+        [card.set_face_up(False) for card in self.deck] # 最后所有牌盖回去
+        random.shuffle(self.deck) # 底下再打乱牌一次
 
     def draw_card_from_deck(self, index):
         if index < 0 or index >= len(self.deck):
@@ -324,17 +321,12 @@ class PigTailGame:
         print(GREEN + ' ' * 22 + "===== 猪尾巴纸牌游戏 =====" + RESET)
         print(GREEN + ' ' * 7 + "规则：抽牌比花色，花色相同则拿走所有牌，最后持牌少者获胜" + RESET)
 
-    def display_deck(self):
-        # 以环形摊开牌组,以供选择
-        p_upper = Pile(self.deck[0:13])
-        p_right = Pile(self.deck[13:26])
-        p_lower = Pile(list(reversed(self.deck[26:39])))
-        p_left = Pile(list(reversed(self.deck[39:52])))
-
+    def generate_deck_layout(self, p_upper, p_right, p_lower, p_left):
         rows_upper = p_upper.show_cards(direction='horizontal', compact=True)
         rows_right = p_right.show_cards(direction='vertical', compact=True)
         rows_lower = p_lower.show_cards(direction='horizontal', compact=True, reversed=True)
         rows_left = p_left.show_cards(direction='vertical', compact=True, reversed=True)
+
 
         deck_row_index = 0
         temp_pile = Pile(self.center_pile[-8:]) # maximum show recent 8 cards
@@ -383,24 +375,28 @@ class PigTailGame:
                         row = row[:-1*len(row_right_content)] + row_right_content
                 deck_arr.append(row)
             deck_row_index += 1
-        
+        return deck_arr
+
+    def attach_pointer_to_deck(self, deck_arr_to_attach, deck_arr_face_up, p_lower, p_left):
         # 附加四周的pointer符号区域
         if self.deck:
             # calc suit symbol position
             ## upper
-            suit_row = re.sub(r'[^-]', ' ', re.sub(r'(♠|♥|♣|♦)', '-', deck_arr[1]))
+            suit_row = re.sub(r'[^-]', ' ', re.sub(r'(♠|♥|♣|♦)', '-', deck_arr_face_up[1]))
             suit_row = suit_row.replace('-', '#', -1)
             if 0<=self.card_pointer<13:
                 card_segments = suit_row.split('#')
-                pointer_index = self.card_pointer # [0..12] --> [0..12]
-                card_segments[pointer_index] = card_segments[pointer_index] + '↓'
+                segment_index = self.card_pointer # [0..12] --> [0..12]
+                card_segments[segment_index] = card_segments[segment_index] + '↓'
                 suit_row = '#'.join(card_segments)
                 suit_row = suit_row.replace('↓#', '↓')
             suit_row = suit_row.replace('#', ' ')
-            deck_arr.insert(0, suit_row)
+
+            deck_arr_face_up.insert(0, suit_row)
+            deck_arr_to_attach.insert(0, suit_row)
             
             ## right
-            suit_row = re.sub(r'[^@]', ' ', re.sub(r'(♠|♥|♣|♦)', '@', ''.join([row[-8] for row in deck_arr])))
+            suit_row = re.sub(r'[^@]', ' ', re.sub(r'(♠|♥|♣|♦)', '@', ''.join([row[-8] for row in deck_arr_face_up])))
             if '@' in suit_row:
                 # this one belongs to upper row
                 first_index = suit_row.index('@')
@@ -416,11 +412,13 @@ class PigTailGame:
                 suit_row = '@'.join(card_segments)
                 suit_row = suit_row.replace('←@', '←')
             suit_row = suit_row.replace('@', ' ')
-            for row_index in range(len(deck_arr)):
-                deck_arr[row_index] = deck_arr[row_index] + suit_row[row_index]
+
+            for row_index in range(len(deck_arr_to_attach)):
+                deck_arr_face_up[row_index] = deck_arr_face_up[row_index] + suit_row[row_index]
+                deck_arr_to_attach[row_index] = deck_arr_to_attach[row_index] + suit_row[row_index]
 
             ## lower
-            suit_row = re.sub(r'[^-]', ' ', re.sub(r'(♠|♥|♣|♦)', '-', deck_arr[-2]))
+            suit_row = re.sub(r'[^-]', ' ', re.sub(r'(♠|♥|♣|♦)', '-', deck_arr_face_up[-2]))
             suit_row = suit_row.replace('-', '#', -1)
             if 26<=self.card_pointer<39:
                 card_segments = suit_row.split('#')
@@ -430,10 +428,12 @@ class PigTailGame:
                 suit_row = '#'.join(card_segments)
                 suit_row = suit_row.replace('↑#', '↑')
             suit_row = suit_row.replace('#', ' ')
-            deck_arr.append(suit_row)
+            
+            deck_arr_face_up.append(suit_row)
+            deck_arr_to_attach.append(suit_row)
 
             ## left
-            suit_row = re.sub(r'[^$]', ' ', re.sub(r'(♠|♥|♣|♦)', '$', ''.join([row[7] for row in deck_arr])))
+            suit_row = re.sub(r'[^$]', ' ', re.sub(r'(♠|♥|♣|♦)', '$', ''.join([row[7] for row in deck_arr_face_up])))
             if '$' in suit_row:
                 last_index = suit_row.rindex('$')
                 suit_row = suit_row[:last_index] + ' ' + suit_row[last_index+1:]
@@ -445,11 +445,34 @@ class PigTailGame:
                 suit_row = '$'.join(card_segments)
                 suit_row = suit_row.replace('→$', '→').replace('$', ' ')
             suit_row = suit_row.replace('$', ' ')
-            for row_index in range(len(deck_arr)):
-                deck_arr[row_index] = suit_row[row_index] + deck_arr[row_index]
+
+            for row_index in range(len(deck_arr_to_attach)):
+                deck_arr_face_up[row_index] = suit_row[row_index] + deck_arr_face_up[row_index]
+                deck_arr_to_attach[row_index] = suit_row[row_index] + deck_arr_to_attach[row_index]
+
+    def display_deck(self):
+        # 以环形摊开牌组,以供选择
+        p_upper = Pile(self.deck[0:13])
+        p_right = Pile(self.deck[13:26])
+        p_lower = Pile(list(reversed(self.deck[26:39])))
+        p_left = Pile(list(reversed(self.deck[39:52])))
+
+        p_upper.set_all_face_up()
+        p_right.set_all_face_up()
+        p_lower.set_all_face_up()
+        p_left.set_all_face_up()
+        deck_arr_face_up = self.generate_deck_layout(p_upper, p_right, p_lower, p_left)
+
+        p_upper.set_all_face_down()
+        p_right.set_all_face_down()
+        p_lower.set_all_face_down()
+        p_left.set_all_face_down()
+        deck_arr_face_down = self.generate_deck_layout(p_upper, p_right, p_lower, p_left)
+        
+        self.attach_pointer_to_deck(deck_arr_face_down, deck_arr_face_up, p_lower, p_left)
 
         # 正式打印
-        for row in deck_arr:
+        for row in deck_arr_face_down:
             print(Card.render_card_row(row))
 
     def display_hand(self):
@@ -472,7 +495,7 @@ class PigTailGame:
 
     def display_player_stat(self):
         print()
-        print(f"玩家 {self.current_player + 1} 的回合")
+        print(f"玩家 {GREEN}{('𝟭', '𝟮')[self.current_player]}{RESET} 的回合")
         player_counts = []
         for i, player in enumerate(self.players):
             count = len(player)
@@ -568,7 +591,7 @@ class PigTailGame:
                     else:
                         return self.hand_pointer
                 elif cmd == 'draw_random':
-                    return random.randint(0, len(self.deck) - 1)
+                    return random.randint(0, len(self.deck) - 1) if self.draw_mode == 'deck' else random.randint(0, len(self.players[self.current_player]) - 1)
                 elif cmd == 'switch_mode':
                     self.draw_mode = 'hand' if self.draw_mode == 'deck' else 'deck'
                     self.hand_pointer = 0
@@ -592,6 +615,7 @@ class PigTailGame:
             card = self.draw_card_from_hand(int(draw_index))
         if not card:
             return False
+        card.set_face_up(True)
         
         print(f"抽到的牌: {card}")
         current_suit = card.get_suit()
@@ -612,9 +636,8 @@ class PigTailGame:
         self.current_player = (self.current_player + 1) % len(self.players)
         return True
     
-    def play_game(self):        
+    def play_game(self):
         while self.deck:
-            self.display()
             if not self.play_turn():
                 break
         self.display()
@@ -637,5 +660,5 @@ class PigTailGame:
 
 if __name__ == "__main__":
     game = PigTailGame()
-    game.initialize_deck(animate=False)
+    game.initialize_deck(animate=True) # 可以关掉动画, 快速洗牌、发牌
     game.play_game()
