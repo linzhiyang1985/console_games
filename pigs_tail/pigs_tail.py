@@ -7,6 +7,8 @@ import msvcrt
 DISPLAY_SUITS = {'S': '♠', 'H': '♥', 'C': '♣', 'D': '♦'}
 DISPLAY_RANKS = {'A':'𝐀', '2':'𝟮', '3':'𝟯', '4':'𝟰', '5':'𝟱', '6':'𝟲',
                  '7':'𝟳', '8':'𝟴', '9':'𝟵', '10':'𝟭𝟬', 'J':'𝐉', 'Q':'𝐐', 'K':'𝐊'}
+SUIT_ORDER = ['D', 'C', 'H', 'S']
+RAND_ORDER = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
 
 BLUE = "\033[94m"
 YELLOW = "\033[93m"
@@ -14,7 +16,6 @@ RED = "\033[91m"
 GREEN = "\033[92m"
 MAGENTA = "\033[95m"
 RESET = "\033[0m"
-
 
 
 class Card:
@@ -61,12 +62,10 @@ class Card:
         return self.rank
     
     def get_rank_value(self):
-        rank_order = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
-        return rank_order.index(self.rank)
+        return RAND_ORDER.index(self.rank)
     
     def get_suit_value(self):
-        suit_order = ['D', 'C', 'H', 'S']
-        return suit_order.index(self.suit)
+        return SUIT_ORDER.index(self.suit)
 
     def get_dot_matrix(self):
         if self.dot_matrix is not None:
@@ -242,6 +241,7 @@ class PigTailGame:
         self.draw_mode = 'deck' # 'deck' or 'hand'
         self.hand_pointer = -1
         self.center_pile = []
+        self.need_help = True
         self.previous_suit = None
     
     def initialize_deck(self, animate=False):
@@ -270,8 +270,7 @@ class PigTailGame:
                 [card.set_face_up(True) for card in self.deck]
         if animate:
             [card.set_face_up(False) for card in self.deck]
-            self.clear()
-            self.display_deck()
+            self.display()
 
     def draw_card_from_deck(self, index):
         if index < 0 or index >= len(self.deck):
@@ -482,11 +481,14 @@ class PigTailGame:
         return player_counts
     
     def display_controls(self):
-        print()
-        print("按[回车]随机抽牌")
-        print("或[方向键],[n/p]选牌, [空格]抽取指定的牌")
-        print("按[x]切换抽牌模式 - 当前抽" + ("手牌" if self.draw_mode == 'hand' else "中心牌"))
-        print("按[q]退出游戏")
+        if self.need_help:
+            print()
+            print("按[回车]随机抽牌")
+            print("或[方向键],[n/p]选牌, [空格]抽取指定的牌")
+            print("按[x]切换抽牌模式 - 当前抽" + ("手牌" if self.draw_mode == 'hand' else "中心牌"))
+            print("按[h]查看操作帮助")
+            print("按[q]退出游戏")
+            self.need_help = False
     
     def display(self):
         self.clear()
@@ -507,6 +509,7 @@ class PigTailGame:
             b'x': 'switch_mode', # switch choosing cards between hand cards and center cards
             b' ': 'draw_target',
             b'\r': 'draw_random',
+            b'h': 'show_help',
             b'q': 'quit',
         }
         while True:
@@ -548,6 +551,15 @@ class PigTailGame:
                         self.hand_pointer_move_backward()
                     elif cmd == 'right':
                         self.hand_pointer_move_forward()
+                    elif cmd in ('up', 'down'):
+                        all_suit_kinds = list(set([card.get_suit() for card in self.players[self.current_player]]))
+                        all_suit_kinds.sort(key= lambda x: SUIT_ORDER.index(x))
+                        current_card_suit = self.players[self.current_player][self.hand_pointer].get_suit()
+                        target_suit = all_suit_kinds[(all_suit_kinds.index(current_card_suit) + len(all_suit_kinds) + (-1 if cmd == 'up' else 1)) % len(all_suit_kinds)]
+                        for index, card in enumerate(self.players[self.current_player]):
+                            if card.get_suit() == target_suit:
+                                self.hand_pointer = index
+                                break
                     self.display()
             else:
                 if cmd == 'draw_target':
@@ -561,6 +573,9 @@ class PigTailGame:
                     self.draw_mode = 'hand' if self.draw_mode == 'deck' else 'deck'
                     self.hand_pointer = 0
                     self.display()
+                elif cmd == 'show_help':
+                    self.need_help = True
+                    self.display_controls()
                 elif cmd == 'quit':
                     exit(0)
                 else:
