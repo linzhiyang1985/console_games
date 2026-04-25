@@ -377,12 +377,88 @@ class PigTailGame:
             deck_row_index += 1
         return deck_arr
 
-    def attach_pointer_to_deck(self, deck_arr_to_attach, deck_arr_face_up, p_lower, p_left):
+    def attach_pointer_to_deck_pre_calculated_version(self, deck_arr, p_upper, p_right, p_lower, p_left):
+        # 因为使用了预计算的pointer位置, deck_arr无论face down还是face up， 都适用
+        # 这些记录是在attach_pointer_to_deck()中计算好的(即最后suit_row.replace之前保留下来)，这里直接使用
+        upper_suit_row = ' #    #    #    #    #    #    #    #    #    #    #    #    #       '
+        right_suit_row = '    @ @ @ @ @ @ @ @ @ @ @ @ @       '
+        lower_suit_row = '       #    #    #    #    #    #    #    #    #    #    #    #    #  '
+        left_suit_row = '        $ $ $ $ $ $ $ $ $ $ $ $ $    '
+        
         # 附加四周的pointer符号区域
         if self.deck:
             # calc suit symbol position
             ## upper
-            suit_row = re.sub(r'[^-]', ' ', re.sub(r'(♠|♥|♣|♦)', '-', deck_arr_face_up[1]))
+            suit_row = upper_suit_row
+            upper_size = len(p_upper)
+            while suit_row.count('#') > upper_size:
+                last_pos = suit_row.rindex('#')
+                suit_row = suit_row[:last_pos] + ' ' + suit_row[last_pos + 1:] # 删除过多的位置, 从后往前删
+            if 0<=self.card_pointer<13:
+                card_segments = suit_row.split('#')
+                segment_index = self.card_pointer # [0..12] --> [0..12]
+                card_segments[segment_index] = card_segments[segment_index] + '↓'
+                suit_row = '#'.join(card_segments)
+                suit_row = suit_row.replace('↓#', '↓')
+            suit_row = suit_row.replace('#', ' ')
+            deck_arr.insert(0, suit_row)
+            
+            ## right
+            suit_row = right_suit_row
+            right_size = len(p_right)
+            while suit_row.count('@') > right_size:
+                last_pos = suit_row.rindex('@')
+                suit_row = suit_row[:last_pos] + ' ' + suit_row[last_pos + 1:] # 删除过多的位置, 从后往前删
+            if 13<=self.card_pointer<26:
+                card_segments = suit_row.split('@')
+                segment_index = self.card_pointer -13 # [13..25] --> [0..12]
+                card_segments[segment_index] = card_segments[segment_index] + '←'
+                suit_row = '@'.join(card_segments)
+                suit_row = suit_row.replace('←@', '←')
+            suit_row = suit_row.replace('@', ' ')
+            for row_index in range(len(deck_arr)):
+                deck_arr[row_index] = deck_arr[row_index] + suit_row[row_index]
+
+            ## lower
+            suit_row = lower_suit_row
+            lower_size = len(p_lower)
+            suit_size = suit_row.count('#')
+            if suit_size > lower_size:
+                suit_row = suit_row.replace('#', ' ', suit_size - lower_size) # 删除过多的位置, 从前往后删
+            if 26<=self.card_pointer<39:
+                card_segments = suit_row.split('#')
+                max_index = 26 + len(p_lower) - 1
+                segment_index = max_index - self.card_pointer # [26..38] --> [12..0]
+                card_segments[segment_index] = card_segments[segment_index] + '↑'
+                suit_row = '#'.join(card_segments)
+                suit_row = suit_row.replace('↑#', '↑')
+            suit_row = suit_row.replace('#', ' ')
+            deck_arr.append(suit_row)
+
+            ## left
+            suit_row = left_suit_row
+            left_size = len(p_left)
+            suit_size = suit_row.count('$')
+            if suit_size > left_size:
+                suit_row = suit_row.replace('$', ' ', suit_size - left_size) # 删除过多的位置, 从前往后删
+            if 39<=self.card_pointer<52:
+                card_segments = suit_row.split('$')
+                max_index = 39 + len(p_left) - 1
+                segment_index = max_index - self.card_pointer # [39..51] --> [12..0]
+                card_segments[segment_index] = card_segments[segment_index] + '→'
+                suit_row = '$'.join(card_segments)
+                suit_row = suit_row.replace('→$', '→').replace('$', ' ')
+            suit_row = suit_row.replace('$', ' ')
+            for row_index in range(len(deck_arr)):
+                deck_arr[row_index] = suit_row[row_index] + deck_arr[row_index]
+
+    def attach_pointer_to_deck(self, deck_arr, p_lower, p_left):
+        # 这只适用于deck_arr是face up的时候, 才能依据每张牌suit字符的位置动态计算pointer位置
+        # 附加四周的pointer符号区域
+        if self.deck:
+            # calc suit symbol position
+            ## upper
+            suit_row = re.sub(r'[^-]', ' ', re.sub(r'(♠|♥|♣|♦)', '-', deck_arr[1]))
             suit_row = suit_row.replace('-', '#', -1)
             if 0<=self.card_pointer<13:
                 card_segments = suit_row.split('#')
@@ -391,12 +467,10 @@ class PigTailGame:
                 suit_row = '#'.join(card_segments)
                 suit_row = suit_row.replace('↓#', '↓')
             suit_row = suit_row.replace('#', ' ')
-
-            deck_arr_face_up.insert(0, suit_row)
-            deck_arr_to_attach.insert(0, suit_row)
+            deck_arr.insert(0, suit_row)
             
             ## right
-            suit_row = re.sub(r'[^@]', ' ', re.sub(r'(♠|♥|♣|♦)', '@', ''.join([row[-8] for row in deck_arr_face_up])))
+            suit_row = re.sub(r'[^@]', ' ', re.sub(r'(♠|♥|♣|♦)', '@', ''.join([row[-8] for row in deck_arr])))
             if '@' in suit_row:
                 # this one belongs to upper row
                 first_index = suit_row.index('@')
@@ -412,13 +486,11 @@ class PigTailGame:
                 suit_row = '@'.join(card_segments)
                 suit_row = suit_row.replace('←@', '←')
             suit_row = suit_row.replace('@', ' ')
-
-            for row_index in range(len(deck_arr_to_attach)):
-                deck_arr_face_up[row_index] = deck_arr_face_up[row_index] + suit_row[row_index]
-                deck_arr_to_attach[row_index] = deck_arr_to_attach[row_index] + suit_row[row_index]
+            for row_index in range(len(deck_arr)):
+                deck_arr[row_index] = deck_arr[row_index] + suit_row[row_index]
 
             ## lower
-            suit_row = re.sub(r'[^-]', ' ', re.sub(r'(♠|♥|♣|♦)', '-', deck_arr_face_up[-2]))
+            suit_row = re.sub(r'[^-]', ' ', re.sub(r'(♠|♥|♣|♦)', '-', deck_arr[-2]))
             suit_row = suit_row.replace('-', '#', -1)
             if 26<=self.card_pointer<39:
                 card_segments = suit_row.split('#')
@@ -428,12 +500,10 @@ class PigTailGame:
                 suit_row = '#'.join(card_segments)
                 suit_row = suit_row.replace('↑#', '↑')
             suit_row = suit_row.replace('#', ' ')
-            
-            deck_arr_face_up.append(suit_row)
-            deck_arr_to_attach.append(suit_row)
+            deck_arr.append(suit_row)
 
             ## left
-            suit_row = re.sub(r'[^$]', ' ', re.sub(r'(♠|♥|♣|♦)', '$', ''.join([row[7] for row in deck_arr_face_up])))
+            suit_row = re.sub(r'[^$]', ' ', re.sub(r'(♠|♥|♣|♦)', '$', ''.join([row[7] for row in deck_arr])))
             if '$' in suit_row:
                 last_index = suit_row.rindex('$')
                 suit_row = suit_row[:last_index] + ' ' + suit_row[last_index+1:]
@@ -445,10 +515,8 @@ class PigTailGame:
                 suit_row = '$'.join(card_segments)
                 suit_row = suit_row.replace('→$', '→').replace('$', ' ')
             suit_row = suit_row.replace('$', ' ')
-
-            for row_index in range(len(deck_arr_to_attach)):
-                deck_arr_face_up[row_index] = suit_row[row_index] + deck_arr_face_up[row_index]
-                deck_arr_to_attach[row_index] = suit_row[row_index] + deck_arr_to_attach[row_index]
+            for row_index in range(len(deck_arr)):
+                deck_arr[row_index] = suit_row[row_index] + deck_arr[row_index]
 
     def display_deck(self):
         # 以环形摊开牌组,以供选择
@@ -457,22 +525,19 @@ class PigTailGame:
         p_lower = Pile(list(reversed(self.deck[26:39])))
         p_left = Pile(list(reversed(self.deck[39:52])))
 
-        p_upper.set_all_face_up()
-        p_right.set_all_face_up()
-        p_lower.set_all_face_up()
-        p_left.set_all_face_up()
-        deck_arr_face_up = self.generate_deck_layout(p_upper, p_right, p_lower, p_left)
+        ## 需要预计算时, 把牌正面翻出来 ##
+        # p_upper.set_all_face_up()
+        # p_right.set_all_face_up()
+        # p_lower.set_all_face_up()
+        # p_left.set_all_face_up()
 
-        p_upper.set_all_face_down()
-        p_right.set_all_face_down()
-        p_lower.set_all_face_down()
-        p_left.set_all_face_down()
-        deck_arr_face_down = self.generate_deck_layout(p_upper, p_right, p_lower, p_left)
+        deck_arr = self.generate_deck_layout(p_upper, p_right, p_lower, p_left)
         
-        self.attach_pointer_to_deck(deck_arr_face_down, deck_arr_face_up, p_lower, p_left)
+        # self.attach_pointer_to_deck(deck_arr, p_lower, p_left) # 需要重新预计算的时候执行一下, 并更新预计算结果
+        self.attach_pointer_to_deck_pre_calculated_version(deck_arr, p_upper, p_right, p_lower, p_left)
 
         # 正式打印
-        for row in deck_arr_face_down:
+        for row in deck_arr:
             print(Card.render_card_row(row))
 
     def display_hand(self):
@@ -660,5 +725,5 @@ class PigTailGame:
 
 if __name__ == "__main__":
     game = PigTailGame()
-    game.initialize_deck(animate=True) # 可以关掉动画, 快速洗牌、发牌
+    game.initialize_deck(animate=True)
     game.play_game()
