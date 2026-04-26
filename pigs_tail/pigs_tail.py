@@ -3,6 +3,8 @@ import re
 import os
 import time
 import msvcrt
+from playsound3 import playsound
+import threading
 
 DISPLAY_SUITS = {'S': '♠', 'H': '♥', 'C': '♣', 'D': '♦'}
 DISPLAY_RANKS = {'A':'𝐀', '2':'𝟮', '3':'𝟯', '4':'𝟰', '5':'𝟱', '6':'𝟲',
@@ -17,6 +19,30 @@ GREEN = "\033[92m"
 MAGENTA = "\033[95m"
 RESET = "\033[0m"
 
+
+class LoopPlayer(threading.Thread):
+    def __init__(self):
+        super().__init__()
+        self.sound_file = r'./sound/background.wav'
+        self.sound_handle = None
+        self.is_stop = False
+        
+    def run(self):
+        self.sound_handle = playsound(self.sound_file, block=False)
+        start_time = time.time()
+        while not self.is_stop:
+            if time.time() - start_time >= 32: # whole sound duration
+                # loop the sound
+                self.sound_handle.stop()
+                self.sound_handle = playsound(self.sound_file, block=False)
+                start_time = time.time()
+            time.sleep(1)
+        self.sound_handle.stop()
+    
+    def stop(self):
+        self.is_stop = True
+
+background_player = None
 
 class Card:
     
@@ -245,6 +271,8 @@ class PigTailGame:
         self.previous_suit = None
     
     def initialize_deck(self, animate=False):
+        sound = playsound('sound/serve_card.wav', block=False)
+
         suits = ['D', 'C', 'H', 'S']
         ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K']
         for suit in suits:
@@ -254,7 +282,9 @@ class PigTailGame:
                 if animate:
                     self.display() # 每多一张牌刷新界面
                     time.sleep(0.2)
+        sound.stop()
         
+        sound = playsound('sound/shuffle.wav', block=False)
         # shuffle 5 times
         for _ in range(5):
             random.shuffle(self.deck) # 洗牌
@@ -268,10 +298,12 @@ class PigTailGame:
 
         [card.set_face_up(False) for card in self.deck] # 最后所有牌盖回去
         random.shuffle(self.deck) # 底下再打乱牌一次
+        sound.stop()
 
     def draw_card_from_deck(self, index):
         if index < 0 or index >= len(self.deck):
             return None
+        playsound('sound/draw_card.wav', block=False)
         card = self.deck.pop(index)
         if self.card_pointer < 0 or self.card_pointer >= len(self.deck):
             self.card_pointer = len(self.deck) - 1
@@ -288,6 +320,7 @@ class PigTailGame:
     def draw_card_from_hand(self, index):
         if index < 0 or index >= len(self.players[self.current_player]):
             return None
+        playsound('sound/draw_card.wav', block=False)
         card = self.players[self.current_player][index]
         self.players[self.current_player].remove_card(card)
         self.draw_mode = 'deck'
@@ -357,7 +390,7 @@ class PigTailGame:
                     row_right_content = ' ' * 9
                 
                 if deck_row_index == 8:
-                    center_content = f'{len(self.center_pile)} cards on table'.center(51)
+                    center_content = f'桌上有{len(self.center_pile)}张牌'.center(51 - 5) #中文占两个字符宽
                 elif deck_row_index > 8 and center_card_arr:
                     center_content = center_card_arr.pop(0).center(51)
                 else:
@@ -565,7 +598,16 @@ class PigTailGame:
         for i, player in enumerate(self.players):
             count = len(player)
             player_counts.append(count)
-            print(f"玩家 {i + 1} 的手牌数量: {count}: {Card.render_card_row(repr(player))}")
+            print(f"玩家 {i + 1} 的手牌(数量{count}):")
+            card_str = repr(player)
+            if card_str:
+                card_list = card_str.split(', ')
+                while card_list:
+                    sub_set = card_list[:13]
+                    card_str = ', '.join(sub_set)
+                    if card_str:
+                        print(f"{Card.render_card_row(card_str)}")
+                    card_list = card_list[13:]
         return player_counts
     
     def display_controls(self):
@@ -602,6 +644,7 @@ class PigTailGame:
         }
         while True:
             key = None
+            cmd = None
             while key is None:
                 if msvcrt.kbhit():
                     key = msvcrt.getch()
@@ -665,11 +708,14 @@ class PigTailGame:
                     self.need_help = True
                     self.display_controls()
                 elif cmd == 'quit':
+                    background_player.stop()
                     exit(0)
                 else:
-                    print("未知按键")
+                    #未知按键
+                    pass
 
     def play_turn(self):
+        global background_player
         self.display()
         
         draw_index = self.get_user_input()
@@ -689,7 +735,8 @@ class PigTailGame:
         
         if self.previous_suit:
             if current_suit == self.previous_suit:
-                print(f"花色相同！玩家 {self.current_player + 1} 拿走所有牌")
+                #花色相同, 当前玩家拿走所有牌
+                playsound('sound/squealing‌.wav', block=False)
                 self.players[self.current_player].add_cards(self.center_pile)
                 self.center_pile = []
                 self.previous_suit = None
@@ -717,13 +764,25 @@ class PigTailGame:
         print()
         # 牌少者胜
         if player_counts[0] > player_counts[1]:
-            print(f"玩家 2 获胜！")
+            print(f'{RED}❉⊱•❉⊱• 恭喜玩家 2 获胜！ •⊰❉•⊰❉{RESET}' f"")
         elif player_counts[0] < player_counts[1]:
-            print(f"玩家 1 获胜！")
+            print(f'{RED}❉⊱•❉⊱• 恭喜玩家 1 获胜！ •⊰❉•⊰❉{RESET}')
         else:
-            print(f"平局！玩家 1 和 2 手牌数量相同")
+            print(f'{BLUE}❉⊱•❉⊱• 平局！玩家 1 和 2 手牌数量相同 •⊰❉•⊰❉{RESET}')
 
 if __name__ == "__main__":
-    game = PigTailGame()
-    game.initialize_deck(animate=True)
-    game.play_game()
+    try:
+        background_player = LoopPlayer()
+        background_player.start()
+        while True:
+            game = PigTailGame()
+            game.initialize_deck(animate=True) # 可以False跳过动画
+            game.play_game()
+            resp = input("再玩一局？(y/[回车] || n):").strip()
+            if resp.lower() != "y" and resp != "":
+                break
+        print(GREEN + "感谢游玩, 再见!" + RESET)
+    except Exception as ex:
+        print(ex)
+    finally:
+        background_player.stop()
