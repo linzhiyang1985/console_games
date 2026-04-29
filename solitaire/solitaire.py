@@ -1,11 +1,11 @@
 import random
 import os
+import sys
 import re
 import msvcrt
 import time
 import threading
 from playsound3 import playsound
-
 
 # 牌的定义
 SUITS = ['♠', '♥', '♣', '♦']
@@ -19,10 +19,16 @@ RED = "\033[91m"
 GREEN = "\033[92m"
 RESET = "\033[0m"
 
+def resource_path(relative_path):
+    """获取由pyinstaller打包后资源的绝对路径"""
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
 class LoopPlayer(threading.Thread):
     def __init__(self):
         super().__init__()
-        self.sound_file = r'./sound/background.mp3'
+        self.sound_file = resource_path(os.path.join('sound', 'background.mp3'))
         self.sound_handle = None
         self.is_stop = False
         
