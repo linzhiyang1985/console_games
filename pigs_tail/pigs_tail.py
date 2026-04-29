@@ -43,6 +43,7 @@ class LoopPlayer(threading.Thread):
         self.is_stop = True
 
 background_player = None
+win_sound_player = None
 
 class Card:
     
@@ -771,18 +772,29 @@ class PigTailGame:
             print(f'{BLUE}❉⊱•❉⊱• 平局！玩家 1 和 2 手牌数量相同 •⊰❉•⊰❉{RESET}')
 
 if __name__ == "__main__":
-    try:
-        background_player = LoopPlayer()
-        background_player.start()
-        while True:
+    while True:
+        try:
+            background_player = LoopPlayer()
+            background_player.start()
+
             game = PigTailGame()
             game.initialize_deck(animate=True) # 可以False跳过动画
             game.play_game()
+
+            background_player.stop()
+            background_player = None
+            win_sound_player = playsound('sound/win.wav', block=False)
+            
             resp = input("再玩一局？(y/[回车] || n):").strip()
             if resp.lower() != "y" and resp != "":
                 break
-        print(GREEN + "感谢游玩, 再见!" + RESET)
-    except Exception as ex:
-        print(ex)
-    finally:
-        background_player.stop()
+        except Exception as ex:
+            print(ex)
+        finally:
+            if background_player:
+                background_player.stop()
+                background_player = None
+            if win_sound_player:
+                win_sound_player.stop()
+                win_sound_player = None
+    print(GREEN + "感谢游玩, 再见!" + RESET)
