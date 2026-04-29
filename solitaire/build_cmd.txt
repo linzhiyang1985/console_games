@@ -1,0 +1,1 @@
+pyinstaller --noconfirm --onefile --console --icon "icon.ico" --add-data "sound\background.mp3;sound"  "solitaire.py"
