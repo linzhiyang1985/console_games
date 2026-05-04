@@ -4,6 +4,8 @@ import msvcrt
 import ctypes
 import time
 import os
+from playsound3 import playsound
+
 
 class Dot:
     def __init__(self, is_end_point:bool=False, color:Color=Color.WHITE):
@@ -131,7 +133,6 @@ class Deck:
         if new_dot is None:
             # 新坐标越界
             return False
-        
         old_dot = self.get_dot_at_cursor()
         old_dot.set_select(False)
         new_dot.set_select(True)
@@ -181,6 +182,7 @@ class Deck:
         if self.get_dot(*dot_positions[0]).is_end_point and \
            self.get_dot(*dot_positions[-1]).is_end_point:
            connected = True
+           playsound('sound/connect.wav', block=False)
         else:
             connected = False
         
@@ -293,6 +295,7 @@ class LineGame:
         for end_point in end_points:
             if not end_point.is_connected:
                 return False
+        playsound('sound/win.wav', block=False)
         return True
 
     def play(self):
@@ -311,44 +314,51 @@ class LineGame:
                 pos_prev = self.deck.get_cursor()
                 dot_prev = self.deck.get_dot_at_cursor()
                 color = dot_prev.get_color()
-                link_of_color = self.deck.get_link(color)
-                if self.move_selector(cmd[0]):
-                    # 移动成功, 但能不能连接要再判断
-                    if len(cmd) > 1 and cmd[1] == 'link':
-                        if dot_prev.is_end_point:
-                            # 清除旧的, 重新连线
-                            self.deck.clear_link(color)
-                        pos_now = self.deck.get_cursor()
-                        dot_now = self.deck.get_dot_at_cursor()
+                if color == Color.WHITE and len(cmd) > 1 and cmd[1] == 'link':
+                    # 如果是连接操作, 起始点应该是有颜色的
+                    playsound('sound/error.wav', block=True)
+                    pass
+                else:
+                    link_of_color = self.deck.get_link(color)
+                    if self.move_selector(cmd[0]):
                         can_connect = True
-                        if dot_now.is_end_point and dot_now.get_color() != color:
-                            # 颜色不同, 不能移动, 回退
-                            self.deck.move_cursor(*pos_prev)
-                            can_connect = False
-                        elif not dot_now.is_end_point:
-                            # 颜色不同, 但能覆盖
-                            color_now = dot_now.get_color()
-                            if color_now in self.deck.links:
-                                color_segments = self.deck.links[color_now]
-                                if pos_now in color_segments:
-                                    while color_segments[-1] != pos_now:
-                                        self.deck.clear_link_segment(color_segments[-1], color_segments[-2])
+                        # 移动成功, 但能不能连接要再判断
+                        if len(cmd) > 1 and cmd[1] == 'link':
+                            if dot_prev.is_end_point:
+                                # 清除旧的, 重新连线
+                                self.deck.clear_link(color)
+                            pos_now = self.deck.get_cursor()
+                            dot_now = self.deck.get_dot_at_cursor()
+                            if dot_now.is_end_point and dot_now.get_color() != color:
+                                # 颜色不同, 不能移动, 回退
+                                self.deck.move_cursor(*pos_prev)
+                                can_connect = False
+                            elif not dot_now.is_end_point:
+                                # 颜色不同, 但能覆盖
+                                color_now = dot_now.get_color()
+                                if color_now in self.deck.links:
+                                    color_segments = self.deck.links[color_now]
+                                    if pos_now in color_segments:
+                                        while color_segments[-1] != pos_now:
+                                            self.deck.clear_link_segment(color_segments[-1], color_segments[-2])
+                                            color_segments.pop()
+                                        # 当前节点也要清除
+                                        self.deck.clear_link_segment(color_segments[-1], color_segments[-2], reset_color_a=False, reset_color_b=False)
                                         color_segments.pop()
-                                    # 当前节点也要清除
-                                    self.deck.clear_link_segment(color_segments[-1], color_segments[-2], reset_color_a=False, reset_color_b=False)
-                                    color_segments.pop()
+                            if can_connect:
+                                dot_now.set_color(color)
+                                if link_of_color == []:
+                                    link_of_color.append(pos_prev)
+                                if pos_prev in link_of_color:
+                                    while link_of_color[-1] != pos_prev:
+                                        self.deck.clear_link_segment(link_of_color[-1], link_of_color[-2], reset_color_b=False)
+                                        link_of_color.pop()
+                                # self.deck.get_dot(*link_of_color[-1]).set_color(color) # 补偿颜色
+                                link_of_color.append(pos_now)
+                                self.deck.set_link(color, link_of_color)
                         if can_connect:
-                            dot_now.set_color(color)
-                            if link_of_color == []:
-                                link_of_color.append(pos_prev)
-                            if pos_prev in link_of_color:
-                                while link_of_color[-1] != pos_prev:
-                                    self.deck.clear_link_segment(link_of_color[-1], link_of_color[-2], reset_color_b=False)
-                                    link_of_color.pop()
-                            # self.deck.get_dot(*link_of_color[-1]).set_color(color) # 补偿颜色
-                            link_of_color.append(pos_now)
-                            self.deck.set_link(color, link_of_color)
-                self.print_deck()
+                            playsound('sound/move.wav', block=False)
+                    self.print_deck()
             if self.check_win():
                 print(f'你赢了! 第{self.stage_id}关结束')
                 break
