@@ -5,6 +5,8 @@ import ctypes
 import time
 import os
 from playsound3 import playsound
+import threading
+from random import choice as rand_choice
 
 
 class Dot:
@@ -76,7 +78,7 @@ class Dot:
 
 class Deck:
     def __init__(self, stage_id):
-        self.array, self.height, self.width, self.end_point_positions = self._load_stage(stage_id) #[[Dot()] * width for _ in range(height)]
+        self.array, self.height, self.width, self.end_point_positions = self._load_stage(stage_id)
         self.cursor_pos = (0,0)
         dot = self.get_dot(*self.cursor_pos)
         dot.set_select(True)
@@ -238,32 +240,50 @@ class Deck:
         dot_positions.clear()
 
 
+def move_console_cursor(row: int, column: int):
+    """移动光标到指定位置"""
+    if os.name == 'nt':
+        msvcrt.putch(b'\x1b')
+        msvcrt.putch(b'[')
+        for r in f"{row}":
+            msvcrt.putch(r.encode())
+        msvcrt.putch(b';')
+        for c in f"{column}":
+            msvcrt.putch(c.encode())
+        msvcrt.putch(b'H')
+    else:
+        curses.move(row, column)
+
+
+def get_user_input():
+    accepted_keys_and_map = {
+        b'H': 'up', b'P': 'down', b'K': 'left', b'M': 'right',
+        b'q': 'quit',
+        b'r': 'restart',
+        b'h': 'help',
+        b'\r': 'enter',
+    }
+    while True:
+        if msvcrt.kbhit():
+            key = msvcrt.getch()
+            if key == b'\xe0':
+                key = msvcrt.getch()
+            if key in accepted_keys_and_map:
+                cmd = accepted_keys_and_map[key]
+                if (ctypes.windll.user32.GetKeyState(0x10) & 0x8000) != 0:
+                    cmd += ' link'
+                return cmd
+
+        time.sleep(0.1)
+
+def clear():
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+
 class LineGame:
     def __init__(self, stage_id):
-        self.stage_id = stage_id
+        self.stage_id = '-'.join([str(int(seg)) for seg in stage_id.split('-')])
         self.deck = Deck(stage_id)
-
-    def get_user_input(self):
-        accepted_keys_and_map = {
-            b'H': 'up', b'P': 'down', b'K': 'left', b'M': 'right',
-            b'q': 'quit',
-            b'r': 'restart',
-        }
-        while True:
-            if msvcrt.kbhit():
-                key = msvcrt.getch()
-                if key == b'\xe0':
-                    key = msvcrt.getch()
-                if key in accepted_keys_and_map:
-                    cmd = accepted_keys_and_map[key]
-                    if (ctypes.windll.user32.GetKeyState(0x10) & 0x8000) != 0:
-                        cmd += ' link'
-                    return cmd
-
-            time.sleep(0.1)
-    
-    def clear(self):
-        os.system('cls' if os.name == 'nt' else 'clear')
     
     def move_selector(self, direction):
         return self.deck.move_cursor_by_direction(direction)
@@ -272,22 +292,16 @@ class LineGame:
         print(f'====连线游戏(第{self.stage_id}关)====')
         print()
     
-    def _move_cursor(self, row: int, column: int):
-        """移动光标到指定位置"""
-        if os.name == 'nt':
-            msvcrt.putch(b'\x1b')
-            msvcrt.putch(b'[')
-            for r in f"{row}":
-                msvcrt.putch(r.encode())
-            msvcrt.putch(b';')
-            for c in f"{column}":
-                msvcrt.putch(c.encode())
-            msvcrt.putch(b'H')
-        else:
-            curses.move(row, column)
+    def print_help(self):
+        print('操作指南:')
+        print('1. 方向键: 移动光标')
+        print('2. Shift + 方向键: 连接两节点')
+        print('3. H键: 显示操作帮助')
+        print('4. R键: 重新开始游戏')
+        print('5. Q键: 退出游戏')
 
     def print_deck(self):
-        self._move_cursor(2, 0)
+        move_console_cursor(2, 0)
         self.deck.print_deck()
     
     def check_win(self):
@@ -299,15 +313,17 @@ class LineGame:
         return True
 
     def play(self):
-        self.clear()
+        clear()
         self.print_title()
         self.print_deck()
         while True:
-            direction = self.get_user_input()
-            cmd = direction.split(' ')
+            instruction = get_user_input()
+            cmd = instruction.split(' ')
             if cmd[0] == 'quit':
-                print('游戏结束,再见!')
                 return True
+            elif cmd[0] == 'help':
+                self.print_deck()
+                self.print_help()
             elif cmd[0] == 'restart':
                 self.deck = Deck(self.stage_id)
             elif cmd[0] in ('up', 'down', 'left', 'right'):
@@ -363,15 +379,109 @@ class LineGame:
                 print(f'你赢了! 第{self.stage_id}关结束')
                 break
 
+class Menu:
+    stage_index = 0
+
+    @staticmethod
+    def print_title():
+        print(f'====连线游戏====')
+        print()
+    
+    @staticmethod
+    def load_stages():
+        #stage files module names
+        return [f.split('.')[0] for f in os.listdir('stages') if '-' in f]
+
+    @staticmethod
+    def print_menu():
+        choice = ''
+        while choice not in ('1', '2', '3'):
+            move_console_cursor(2, 0)
+            print('1. 新游戏')
+            print('2. 选择关卡')
+            print('3. 退出游戏')
+            print(' ' * 40)
+            move_console_cursor(5, 0)
+            choice = input('请输入你的选择: ').strip()
+        return choice
+    
+
+    @staticmethod
+    def print_stage_list(selected_index, stage_id_list):
+        move_console_cursor(2, 0)
+        for index, stage_id in enumerate(stage_id_list):
+            if index == selected_index:
+                print(Color.BG_DARK_WHITE + stage_id + Color.RESET + ' ' * 16)
+            else:
+                print(stage_id + ' ' * 16)
+    
+    @staticmethod
+    def play_filtered_stages(stage_files):
+        for stage_id in stage_files:
+            game = LineGame(stage_id)
+            is_quit = game.play()
+            if is_quit:
+                break
+            next_stage = input('下一局? (y/n)').strip().lower()
+            if not (next_stage == '' or next_stage[0] == 'y'):
+                break
+
+
+class LoopPlayer(threading.Thread):
+    def __init__(self):
+        super().__init__()
+        self.file_name_and_track_length = []
+        files = [f for f in os.listdir('./music') if f.endswith('.mp3')]
+        for name in files:
+            min, sec = name.split('.')[0].split('_')
+            track_length = int(min) * 60 + int(sec)
+            self.file_name_and_track_length.append((name, track_length))
+        self.sound_handle = None
+        self.is_stop = False
+        
+    def run(self):
+        start_time = time.time()
+        sound_file, track_length = rand_choice(self.file_name_and_track_length)
+        self.sound_handle = playsound(f'./music/{sound_file}', block=False)
+        while not self.is_stop:
+            if time.time() - start_time >= track_length: # whole sound duration
+                # play random sound
+                self.sound_handle.stop()
+                start_time = time.time()
+                sound_file, track_length = rand_choice(self.file_name_and_track_length)
+                self.sound_handle = playsound(f'./music/{sound_file}', block=False)
+            time.sleep(1)
+        self.sound_handle.stop()
+    
+    def stop(self):
+        self.is_stop = True
+
+
 if __name__ == '__main__':
-    stage_files = os.listdir('stages')
-    for file_name in stage_files:
-        if '-' not in file_name:
-            continue
-        game = LineGame(file_name.split('.')[0])
-        is_quit = game.play()
-        if is_quit:
-            break
-        next_stage = input('下一局? (y/n)').strip().lower()
-        if not (next_stage == '' or next_stage[0] == 'y'):
-            break
+    try:
+        background_player = LoopPlayer()
+        background_player.start()
+        clear()
+        Menu.print_title()
+        choice = Menu.print_menu()
+        stage_id_list = Menu.load_stages()
+        if choice == '1':
+            Menu.play_filtered_stages(stage_id_list)
+        elif choice == '2':
+            while True:
+                Menu.print_stage_list(Menu.stage_index, stage_id_list)
+                print('请用光标选择开始的关卡')
+                cmd = get_user_input()
+                if cmd == 'enter':
+                    filtered_stage_list = stage_id_list[Menu.stage_index:]
+                    break
+                elif cmd == 'up':
+                    Menu.stage_index = (Menu.stage_index - 1 + len(stage_id_list)) % len(stage_id_list)
+                elif cmd == 'down':
+                    Menu.stage_index = (Menu.stage_index + 1) % len(stage_id_list)
+            Menu.play_filtered_stages(filtered_stage_list)
+    except Exception as e:
+        pass
+    finally:
+        background_player.stop()
+        print('游戏结束,再见!')
