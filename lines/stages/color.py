@@ -8,8 +8,13 @@ class Color:
     CYAN = '\033[96m'
 
     DARK_RED = '\033[31m'
+    DARK_GREEN = '\033[32m'
     DARK_YELLOW = '\033[33m'
-    WHITE = '\033[97m'
+    DARK_BLUE = '\033[34m'
+    DARK_MAGENTA = '\033[35m'
+    DARK_CYAN = '\033[36m'
+    
+    WHITE = '\033[97m'  # empty dot default color
     RESET = '\033[0m'
 
-    BG_DARK_WHITE = '\033[47;30m'
+    BG_DARK_WHITE = '\033[47;30m' #47--bg, 30--fg
