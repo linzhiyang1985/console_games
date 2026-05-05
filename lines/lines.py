@@ -1,3 +1,4 @@
+from multiprocessing import current_process
 from stages.color import Color
 from importlib import import_module
 import msvcrt
@@ -381,6 +382,7 @@ class LineGame:
 
 class Menu:
     stage_index = 0
+    stage_page = 0
 
     @staticmethod
     def print_title():
@@ -469,16 +471,26 @@ if __name__ == '__main__':
             Menu.play_filtered_stages(stage_id_list)
         elif choice == '2':
             while True:
-                Menu.print_stage_list(Menu.stage_index, stage_id_list)
-                print('请用光标选择开始的关卡')
+                current_page_list = stage_id_list[Menu.stage_page * 10:(Menu.stage_page + 1) * 10] # 每10关为一页, 避免列表过长
+                total_pages = len(stage_id_list) // 10 + (1 if len(stage_id_list) % 10 != 0 else 0)
+                Menu.print_stage_list(Menu.stage_index, current_page_list)
+                print('请用光标选择开始的关卡(↔翻页,↕选关)')
                 cmd = get_user_input()
                 if cmd == 'enter':
-                    filtered_stage_list = stage_id_list[Menu.stage_index:]
+                    filtered_stage_list = stage_id_list[Menu.stage_page * 10 + Menu.stage_index:]
                     break
                 elif cmd == 'up':
-                    Menu.stage_index = (Menu.stage_index - 1 + len(stage_id_list)) % len(stage_id_list)
+                    Menu.stage_index = (Menu.stage_index - 1 + len(current_page_list)) % len(current_page_list)
                 elif cmd == 'down':
-                    Menu.stage_index = (Menu.stage_index + 1) % len(stage_id_list)
+                    Menu.stage_index = (Menu.stage_index + 1) % len(current_page_list)
+                elif cmd == 'left':
+                    Menu.stage_page = (Menu.stage_page - 1 + total_pages) % total_pages
+                    Menu.stage_index = 0
+                elif cmd == 'right':
+                    Menu.stage_page = (Menu.stage_page + 1) % total_pages
+                    Menu.stage_index = 0
+                elif cmd == 'quit':
+                    break
             Menu.play_filtered_stages(filtered_stage_list)
     except Exception as e:
         pass
