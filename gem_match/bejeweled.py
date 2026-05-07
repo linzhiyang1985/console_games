@@ -50,7 +50,7 @@ class BejeweledGame:
     def print_rules(self):
         if self.need_help:
             print("游戏规则: 交换相邻宝石，使至少3颗相同颜色的宝石连成一线")
-            print("方向键移动光标, Shift+方向键交换宝石, 'q' 退出游戏")
+            print("方向键移动光标, Shift+方向键交换宝石, 't'提示, 'q'退出游戏")
             self.need_help = False
     
     def print_score(self):
@@ -279,6 +279,7 @@ class BejeweledGame:
         accepted_keys_and_map = {
             b'H': 'up', b'P': 'down', b'K': 'left', b'M': 'right',
             b'q': 'quit', b'Q': 'quit',
+            b't': 'tip',
             b'h': 'help',
             b'\r': 'enter',
         }
@@ -310,6 +311,11 @@ class BejeweledGame:
             elif cmd == 'help':
                 self.need_help = True
                 return True
+            elif cmd == 'tip':
+                is_no_more_moves, hint_pos = self.check_no_more_moves()
+                if not is_no_more_moves:
+                    self.cursor_pos = hint_pos
+                return True
             elif cmd in ('up', 'down', 'left', 'right'):
                 row, col = self.cursor_pos
                 direction = cmd
@@ -337,7 +343,7 @@ class BejeweledGame:
                 # swap
                 temp_board[row][col], temp_board[row][col+1] = temp_board[row][col+1], temp_board[row][col]
                 if self.has_matches(temp_board):
-                    return False
+                    return False, (row, col)
                 # swap back
                 temp_board[row][col], temp_board[row][col+1] = temp_board[row][col+1], temp_board[row][col]
         # 检查垂直匹配
@@ -346,10 +352,10 @@ class BejeweledGame:
                 # swap
                 temp_board[row][col], temp_board[row+1][col] = temp_board[row+1][col], temp_board[row][col]
                 if self.has_matches(temp_board):
-                    return False
+                    return False, (row, col)
                 # swap back
                 temp_board[row][col], temp_board[row+1][col] = temp_board[row+1][col], temp_board[row][col]
-        return True
+        return True, None
 
     def play(self):
         self.print_title()
@@ -360,7 +366,7 @@ class BejeweledGame:
             if not self.handle_input():
                 break
             self.process_matches()
-            if self.check_no_more_moves():
+            if self.check_no_more_moves()[0]:
                 self.game_over = True
                 print("没办法再移动了！")
         
