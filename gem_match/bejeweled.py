@@ -427,9 +427,9 @@ class BejeweledGame:
             self.process_matches()
             if self.check_no_more_moves()[0]:
                 self.game_over = True
-                messages.extend(["没办法再移动了！"])
+                messages.extend(["", "没办法再移动了！"])
         
-        messages.extend(["", f"游戏结束! 最终得分: {self.score}"])
+        messages.extend([f"游戏结束! 最终得分: {self.score}"])
         self.print_frame(messages)
 
 class LoopPlayer(threading.Thread):
@@ -448,6 +448,7 @@ class LoopPlayer(threading.Thread):
                 # play random sound
                 self.sound_handle.stop()
                 self.sound_handle = playsound(self.sound_file_path, block=False)
+                start_time = time.time()
             time.sleep(1)
         self.sound_handle.stop()
     
