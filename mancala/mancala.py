@@ -7,9 +7,11 @@ import sys
 import os
 import re
 import threading
+from playsound3 import playsound
 
 
 # 颜色代码
+RED = '\033[91m'
 GREEN = '\033[92m'
 BLUE = '\033[94m'
 YELLOW = '\033[93m'
@@ -78,12 +80,11 @@ class ScreenFramePrinter:
             ScreenFramePrinter.move_console_cursor(i+1, 1)
             print(row)
 
-
 class LoopPlayer(threading.Thread):
     def __init__(self):
         super().__init__()
-        self.sound_file_path = 'sound/background.mp3'
-        self.track_length = 157
+        self.sound_file_path = 'sound/background.wav'
+        self.track_length = 65
         self.sound_handle = None
         self.is_stop = False
         
@@ -104,7 +105,7 @@ class LoopPlayer(threading.Thread):
 
 class MancalaGame:
     def __init__(self, mode=1, mirror_control=False):
-        # 初始化棋盘 (逆时针方向): [坑1-6 (下标0-5), 玩家1存储区(下标6), 坑7-12 (下标7-12), AI/玩家2存储区(下标13)]
+        # 初始化棋盘 (逆时针方向): [坑1-6 (下标0-5), 玩家1存储区(下标6), 坑7-12 (下标7-12), 电脑/玩家2存储区(下标13)]
         self.board = [4] * 6 + [0] + [4] * 6 + [0]
         self.mode = mode
         self.mirror_control = mirror_control
@@ -153,6 +154,7 @@ class MancalaGame:
                 new_index = allowed_pits[0]
             # 更新选择器位置
             self.player_selector_index[self.current_player] = new_index
+            self.play_move()
         elif key == 'enter':
             if self.is_valid_move(self.player_selector_index[self.current_player]):
                 return self.player_selector_index[self.current_player]
@@ -162,14 +164,33 @@ class MancalaGame:
     def clear(self):
         self.frame_printer.clear()
     
+    def play_move(self):
+        playsound('sound/move.wav', block=False)
+    
+    def play_pick(self):
+        playsound('sound/pick.wav')
+    
+    def play_drop(self):
+        playsound('sound/drop.wav', block=False)
+    
+    def play_capture_and_drops(self):
+        playsound('sound/capture.wav')
+        for _ in range(3):
+            time.sleep(0.1)
+            self.play_drop()
+    
+    def play_win(self):
+        playsound('sound/win.wav')
+
     def output_title(self):
-        return [f"{GREEN}{'=' * 70}{RESET}",
-                f"{GREEN}{' ' * 34}播棋{' ' * 34}{RESET}",
-                f"{GREEN}{'=' * 70}{RESET}"
-        ]
+        title_rows = []
+        title_rows.extend(self.output_separator())
+        title_rows.append(f"{GREEN}{' ' * 34}播棋{' ' * 34}{RESET}")
+        title_rows.extend(self.output_separator())
+        return title_rows
     
     def output_upper_player_info(self):
-        player_name = "AI" if self.mode == 1 else "玩家2"
+        player_name = "电脑" if self.mode == 1 else "玩家2"
         return [f"{YELLOW if self.current_player == 2 else GREEN}{player_name}: {BLUE}{self.board[13]}{RESET}"]
 
     def output_lower_player_info(self):
@@ -225,11 +246,14 @@ class MancalaGame:
             over_all_rows.append(concated_row)
         return over_all_rows
     
+    def output_separator(self):
+        return [f"{GREEN}{'=' * 70}{RESET}"]
+
     def output_game_status(self):
         status_rows = []
-        status_rows.append(f"{GREEN}{'=' * 70}{RESET}")
+        
         if self.mode == 1:
-            current_name = "玩家" if self.current_player == 1 else "AI"
+            current_name = "玩家" if self.current_player == 1 else "电脑"
         else:
             current_name = "玩家1" if self.current_player == 1 else "玩家2"
         status_rows.append(f"当前玩家: {current_name}" + (" (额外回合)" if self.is_extra_round else ""))
@@ -254,18 +278,12 @@ class MancalaGame:
 
         ## 玩家2的坑
         upper_player_concated_rows = self.concate_blocks(upper_player_stock_rows[0:5], heading_placeholders, self.concate_blocks(*upper_slots), heading_placeholders, lower_player_stock_rows[0:5])
-        # for row in concated_rows:
-        #     print(row)
 
         ## 中间分隔区
         separator_concated_rows = self.concate_blocks(upper_player_stock_rows[5:8], heading_placeholders[:3], circle_indicators, heading_placeholders[:3], lower_player_stock_rows[5:8])
-        # for row in concated_rows:
-        #     print(row)
 
         ## 玩家1的坑
         lower_player_concated_rows = self.concate_blocks(upper_player_stock_rows[8:13], heading_placeholders, self.concate_blocks(*lower_slots), heading_placeholders, lower_player_stock_rows[8:13])
-        # for row in concated_rows:
-        #     print(row)
 
         board_rows = upper_player_concated_rows + separator_concated_rows + lower_player_concated_rows
         return board_rows
@@ -277,13 +295,13 @@ class MancalaGame:
             if winner == "平局":
                 winner_rows.append(f"游戏结束！平局！")
                 winner_rows.append(f"你的得分: {self.board[6]}")
-                winner_rows.append(f"AI得分: {self.board[13]}")
+                winner_rows.append(f"电脑得分: {self.board[13]}")
             else:
-                winner_rows.append(f"游戏结束！{'你' if winner == '玩家1' else 'AI'} 获胜！")
+                winner_rows.append(f"游戏结束！{RED}❉⊱•❉⊱• {'你' if winner == '玩家1' else '电脑'} 获胜！•⊰❉•⊰❉{RESET}")
                 winner_rows.append(f"你的得分: {self.board[6]}")
-                winner_rows.append(f"AI得分: {self.board[13]}")
+                winner_rows.append(f"电脑得分: {self.board[13]}")
         else:
-            winner_rows.append(f"游戏结束！{winner} 获胜！")
+            winner_rows.append(f"游戏结束！{RED}❉⊱•❉⊱• {winner} 获胜！•⊰❉•⊰❉{RESET}")
             winner_rows.append(f"玩家1得分: {self.board[6]}")
             winner_rows.append(f"玩家2得分: {self.board[13]}")
         return winner_rows
@@ -300,15 +318,19 @@ class MancalaGame:
         board_rows = self.output_board()
         # 玩家1的信息
         lower_player_info_rows = self.output_lower_player_info()
-        # 游戏状态
-        game_status_rows = self.output_game_status()
+        
+        frame_rows = title_rows + upper_player_info_rows + board_rows + lower_player_info_rows
 
-        frame_rows = title_rows + upper_player_info_rows + board_rows + lower_player_info_rows + game_status_rows
-        if self.messages:
-            frame_rows = frame_rows + self.messages
-            self.messages.clear()
+        frame_rows.extend(self.output_separator())
         if self.game_over:
-            frame_rows += self.output_winner_info()
+            frame_rows += self.output_winner_info() # 游戏结果
+        else:
+            frame_rows += self.output_game_status() # 游戏状态
+        
+        if self.messages:
+            frame_rows = frame_rows + self.messages # 消息提示
+            self.messages.clear() # 一次性显示
+        
         self.frame_printer.print_frame(frame_rows)
 
     def is_valid_move(self, pit):
@@ -323,6 +345,7 @@ class MancalaGame:
         stones = self.board[pit]
         self.board[pit] = 0
         current_pos = pit
+        self.play_pick()
         
         while stones > 0:
             current_pos = (current_pos + 1) % 14
@@ -332,6 +355,9 @@ class MancalaGame:
                 continue
             self.board[current_pos] += 1
             stones -= 1
+            self.play_drop()
+            self.print_frame()
+            time.sleep(0.2)
         
         # 检查最后一粒棋子的位置
         last_pos = current_pos
@@ -347,12 +373,14 @@ class MancalaGame:
                 self.board[6] += self.board[last_pos] + self.board[opposite_pit]
                 self.board[last_pos] = 0
                 self.board[opposite_pit] = 0
+                self.play_capture_and_drops()
         elif self.current_player == 2 and 7 <= last_pos <= 12 and self.board[last_pos] == 1:
             opposite_pit = 12 - last_pos
             if self.board[opposite_pit] > 0:
                 self.board[13] += self.board[last_pos] + self.board[opposite_pit]
                 self.board[last_pos] = 0
                 self.board[opposite_pit] = 0
+                self.play_capture_and_drops()
         
         # 检查是否获得额外回合
         extra_turn = False
@@ -394,7 +422,7 @@ class MancalaGame:
             if self.board[6] > self.board[13]:
                 return "玩家1"
             elif self.board[13] > self.board[6]:
-                return "AI"
+                return "电脑"
             else:
                 return "平局"
         else:
@@ -437,7 +465,9 @@ def main():
     print("选择游戏模式：")
     print("1. 人机对战")
     print("2. 双人对战")
-    mode = input("请输入选择 (1/2,直接[回车]默认1): ").strip()
+    mode = input("请输入选择 (1/2,直接[回车]默认1),q退出游戏): ").strip()
+    if mode.lower() == 'q':
+        return
     mode = 1 if mode == '' else int(mode)
     
     mirror_control = True
@@ -480,18 +510,26 @@ def main():
                 except ValueError:
                     pass
         else:
-            # AI 移动
-            game.set_message("AI 正在思考...")
+            # 电脑 移动
+            game.set_message("电脑 正在思考...")
             game.print_frame()
             time.sleep(0.5)
             ai_pit = game.ai_move()
-            game.set_message(f"AI 选择了格子{ai_pit - 6}")
+            game.set_message(f"电脑 选择了格子{ai_pit - 6}")
             game.make_move(ai_pit)
     
     # 游戏结束
     game.end_game()
     game.print_frame()
+    game.play_win()
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        background_player = LoopPlayer()
+        background_player.start()
+        main()
+    except:
+        pass
+    finally:
+        background_player.stop()
