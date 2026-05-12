@@ -11,7 +11,7 @@ import threading
 
 
 CHINESE_CHAR_PATTERN = re.compile(r'[\u4e00-\u9fa5]{1}')  # 中文字符的Unicode范围
-WIDECHAR_PATTERN = re.compile(r'[^\u0001-\u4e00]{1}')  # 任意宽字符, 如Emoji
+WIDECHAR_PATTERN = re.compile(r'[^\u0001-\u4dff]{1}')  # 任意宽字符, 如Emoji
 
 GEM_TYPES = ['💎', '🧊', '💜', '🌸', '🌕', '🍀', '🚀'] ## 🏀🔴 🔶 '🟩',❄ '💠'  🔷 '💛'   #'🟥', '🟢', '🔵', '🟡', '🟣'
 EXPLOSED_GEM = '💥'
