@@ -318,6 +318,9 @@ class Board:
         self.clear_same_emoji()
 
         cursor_r, cursor_c = self.cursor_pos
+        if self.gems[cursor_r][cursor_c].emoji == '  ':
+            return
+        
         self.prev_same_emoji_positions = self.find_same_emojis(self.gems[cursor_r][cursor_c].emoji)
         ## 标记新一批的select状态
         for r, c, in self.prev_same_emoji_positions:
@@ -437,7 +440,7 @@ class Board:
         return moving_blocks
 
     def reset_blocks_to_original(self):
-        if self.original_block_positions and self.prev_block_positions != self.original_block_positions:
+        if self.prev_block_positions and self.original_block_positions and self.prev_block_positions != self.original_block_positions:
             for index, (r, c) in enumerate(self.prev_block_positions):
                 o_r, o_c = self.original_block_positions[index]
                 self.gems[o_r][o_c] = self.gems[r][c]
