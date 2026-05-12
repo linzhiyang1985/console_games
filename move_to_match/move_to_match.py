@@ -326,6 +326,13 @@ class Board:
         for r, c, in self.prev_same_emoji_positions:
             self.gems[r][c].set_select(True)
 
+    def all_clear(self):
+        for r in range(self.board_height):
+            for c in range(self.board_width):
+                if self.gems[r][c].emoji != '  ':
+                    return False
+        return True
+
     def output_board(self):
         if self.show_same_emoji:
             self.update_same_emoji()
@@ -669,7 +676,7 @@ class Game:
     def play(self):
         frame_printer.clear()
         self.print_frame()
-        while True:
+        while not self.board.all_clear():
             cmd = self.board.get_user_input()
             if cmd == 'help':
                 self.need_help = True
@@ -679,6 +686,10 @@ class Game:
             else:
                 self.board.handle_user_input(cmd)
             self.print_frame()
+
+        self.set_message('恭喜你，你完成了游戏！')
+        self.print_frame()
+
 
 if __name__ == '__main__':
     try:
