@@ -19,7 +19,7 @@ RESET = '\033[0m'
 
 class ScreenFramePrinter:
     COLOR_PATTERN = re.compile(r'\x1b\[\d+m')
-    WIDECHAR_PATTERN = re.compile(r'[^\u0001-\u4e00]{1}')  # 任意宽字符, 如中文, Emoji等
+    WIDECHAR_PATTERN = re.compile(r'[^\u0001-\u4dff]{1}')  # 任意宽字符, 如中文, Emoji等
     IS_WINDOWS = (os.name == 'nt')
 
     def __init__(self):
