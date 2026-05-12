@@ -52,6 +52,9 @@ class ScreenFramePrinter:
     def widechar_count(row):
         return len(ScreenFramePrinter.WIDECHAR_PATTERN.findall(row)) # 每个中文字符/Emoji占两位宽度
     
+    def clear_cache(self):
+        self.prev_frame_rows = []
+
     def calculate_delta_frame_row(self, new_frame_rows):
         delta_frame_rows = []
         for i, new_row in enumerate(new_frame_rows):
