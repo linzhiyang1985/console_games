@@ -32,6 +32,7 @@ class Color:
     WHITE = '\033[97m'  # default foreground
     RESET = '\033[0m'
 
+    BG_DARK_BLUE = '\033[44m'
     BG_DARK_WHITE = '\033[47m' #47--bg, XXXX--fg
     
 class Gem:
@@ -81,9 +82,9 @@ class Gem:
         
         # render
         if self.highlight:
-            bg_color = Color.BG_DARK_WHITE
+            bg_color = Color.BG_DARK_BLUE
         else:
-            bg_color = Color.BLACK
+            bg_color = None
         
         if self.is_option:
             if self.selected:
@@ -221,15 +222,16 @@ class Board:
         ['🐝', '🐶', '🐲', '☂️', '☔', '🌕', '🌏'],
     ]
 
-    def __init__(self):
+    def __init__(self, difficulty_level=5):
         self.board_width = 14
         self.board_height = 10
         self.gems = [[Gem('  ') for _ in range(self.board_width)] for _ in range(self.board_height)]
-        self.init_gems()
+        pair_counts = ((1, 2), (3, 4), (5, 6), (7, 8), (9, 10))[difficulty_level-1]
+        self.init_gems(pair_counts)
         self.cursor_pos = (0, 0)
         self.gems[self.cursor_pos[0]][self.cursor_pos[1]].set_select(True)
 
-        self.show_same_emoji = False
+        self.mark_same_emoji_flag = False
         self.prev_same_emoji_positions = []
 
         self.in_move_process = False
@@ -242,7 +244,7 @@ class Board:
         self.option_index = 0
     
     ## same emoji char appears as a pair within the board
-    def init_gems(self):
+    def init_gems(self, pair_counts=(9, 10)):
         total = self.board_width * self.board_height
         remain_emojis = []
         [remain_emojis.extend(row) for row in Board.EMOJI]
@@ -251,7 +253,7 @@ class Board:
         while total > 0:
             emoji = random.choice(remain_emojis)
             remain_emojis.remove(emoji)
-            for _ in range(random.choice((1, 2))): #  for the same emoji, may generate one pair or two pairs
+            for _ in range(random.choice(pair_counts)): #  for the same emoji, may generate one pair or two pairs
                 if not empty_slots:
                     break
                 # fill into one pair with the same same emoji
@@ -313,18 +315,19 @@ class Board:
         for r, c in self.prev_same_emoji_positions:
             self.gems[r][c].set_select(False)
             self.prev_same_emoji_positions = []
-
-    def update_same_emoji(self):
-        self.clear_same_emoji()
-
+    
+    def mark_same_emoji(self):
         cursor_r, cursor_c = self.cursor_pos
         if self.gems[cursor_r][cursor_c].emoji == '  ':
             return
-        
         self.prev_same_emoji_positions = self.find_same_emojis(self.gems[cursor_r][cursor_c].emoji)
         ## 标记新一批的select状态
         for r, c, in self.prev_same_emoji_positions:
             self.gems[r][c].set_select(True)
+
+    def update_same_emoji(self):
+        self.clear_same_emoji()
+        self.mark_same_emoji()
 
     def all_clear(self):
         for r in range(self.board_height):
@@ -334,7 +337,7 @@ class Board:
         return True
 
     def output_board(self):
-        if self.show_same_emoji:
+        if self.mark_same_emoji_flag:
             self.update_same_emoji()
         else:
             self.clear_same_emoji()
@@ -402,7 +405,7 @@ class Board:
             b'q': 'quit', b'Q': 'quit',
             b'a': 'help',
             b'x': 'shuffle', b'X': 'shuffle',
-            b's': 'toggle_same', b'S': 'toggle_same',
+            b's': 'mark_same_toggle', b'S': 'mark_same_toggle',
             b'r': 'refresh',
             b'\r': 'enter',
         }
@@ -527,9 +530,8 @@ class Board:
         r2, c2 = gem_pos2
         self.gems[r1][c1], self.gems[r2][c2] = self.gems[r2][c2], self.gems[r1][c1]
     
-    def shuffle_gems(self):
-        not_empty_positions = self.get_not_empty_slots()
-        while len(not_empty_positions) > 1:
+    def shuffle_gems(self, not_empty_positions, stop_at_size=1):
+        while len(not_empty_positions) > max(stop_at_size, 1):
             index1 = random.randint(0, len(not_empty_positions) - 1)
             index2 = random.randint(0, len(not_empty_positions) - 1)
             if index1 != index2:
@@ -550,6 +552,9 @@ class Board:
 
     def play_reset(self):
         playsound('sound/reset.mp3', block=False)
+    
+    def play_shuffle(self):
+        playsound('sound/shuffle.mp3', block=False)
 
     opposite_direction = {
         'left': 'right',
@@ -558,8 +563,8 @@ class Board:
         'down': 'up',
     }
     def handle_user_input(self, cmd):
-        if cmd == 'toggle_same':
-            self.show_same_emoji = not self.show_same_emoji
+        if cmd == 'mark_same_toggle':
+            self.mark_same_emoji_flag = not self.mark_same_emoji_flag
         elif cmd in ('up', 'down', 'left', 'right'):
             if self.in_move_process:
                 ### 移动关联块 ###
@@ -630,20 +635,19 @@ class Board:
             self.original_direction = None # 重置移动方向
             self.original_block_positions = [] # 清空移动块的位置
             self.prev_block_positions = [] # 清空上一次移动块的位置
-        elif cmd == 'shuffle':
-            self.shuffle_gems()
         elif cmd == 'quit':
             sys.exit()
 
 
 class Game:
-    def __init__(self):
-        self.board = Board()
+    def __init__(self, game_stage=1):
+        self.game_stage = game_stage
+        self.board = Board(6-game_stage)
         self.messages = []
         self.need_help = True
         
     def output_title(self):
-        return [f'{"="*22} 对对碰乐园 {"="*22}']
+        return [f'{"="*21} 对对碰乐园 (第{self.game_stage}关) {"="*21}']
 
     def output_help(self):
         return [
@@ -683,6 +687,20 @@ class Game:
             if cmd == 'refresh':
                 frame_printer.clear_cache()
                 frame_printer.clear()
+            if cmd == 'shuffle':
+                not_empty_positions = self.board.get_not_empty_slots()
+                original_size = len(not_empty_positions)
+                animation_batch = original_size//5
+                next_stop_point = original_size - animation_batch
+                self.board.play_shuffle()
+                self.board.clear_same_emoji()
+                frame_printer.clear()
+                for stop_point in range(next_stop_point, -1, -animation_batch):
+                    self.board.shuffle_gems(not_empty_positions, stop_point)
+                    self.print_frame()
+                    time.sleep(0.2)
+                if self.board.mark_same_emoji_flag:
+                    self.board.mark_same_emoji()
             else:
                 self.board.handle_user_input(cmd)
             self.print_frame()
@@ -695,8 +713,16 @@ if __name__ == '__main__':
     try:
         background_sound = LoopPlayer()
         background_sound.start()
-        game = Game()
-        game.play()
+        for i in range(1, 6):
+            game = Game(game_stage=i)
+            game.play()
+            game.set_message('按[回车]继续下一关(q退出)...')
+            game.print_frame()
+            cmd = game.board.get_user_input()
+            if cmd == 'quit':
+                break
+            else:
+                continue
     except Exception as ex:
         pass
     finally:
