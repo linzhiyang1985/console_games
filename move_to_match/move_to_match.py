@@ -403,10 +403,11 @@ class Board:
         accepted_keys_and_map = {
             b'H': 'up', b'P': 'down', b'K': 'left', b'M': 'right',
             b'q': 'quit', b'Q': 'quit',
-            b'a': 'help',
+            b'a': 'help', b'A': 'help',
+            b'z': 'tip', b'Z': 'tip',
             b'x': 'shuffle', b'X': 'shuffle',
             b's': 'mark_same_toggle', b'S': 'mark_same_toggle',
-            b'r': 'refresh',
+            b'r': 'refresh', b'R': 'refresh',
             b'\r': 'enter',
         }
         while True:
@@ -651,13 +652,14 @@ class Game:
 
     def output_help(self):
         return [
-            '====操作指南 ====',
+            '==== 操作指南 ====',
             '获得此帮助: a',
             '移动光标: 方向键',
-            '移动块: Shift + 方向键',
-            '打乱: x',
+            '移动物品: shift + 方向键',
             '标记相同物品: s',
+            '*快速跳转到可匹配的位置: z',
             '确认选择多匹配之一: [回车]',
+            '打乱物品: x',
             '重绘界面: r',
             '退出游戏: q',
         ]
@@ -677,17 +679,147 @@ class Game:
         
         frame_printer.print_frame(frame_rows)
 
+    def check_has_move_and_can_match(self, board_str):
+        board_str = board_str.replace('*', '')
+        # 一维横向
+        arr_rows = board_str.split('\n')
+        # 二维数组
+        arr_cells = [row.split(',') for row in board_str.replace('*', '').split('\n')]
+        # 一维纵向
+        arr_cols = []
+        for j in range(len(arr_cells[0])):
+            arr_cols.append(','.join([row[j] for row in arr_cells]))
+        
+        CONTINUOUS_EMOJI_PATTERN = re.compile(r'([^\u0001-\u4dff]{1})[ ,]+\1')
+        CONTINUOUS_EMPTY_SLOTS_PATTERN = re.compile(r'(,  )+')
+
+        ## 检查某个位置非空, 在不移动的前提下, 查看它的上下左右最临近的第一个物品是否匹配
+        #横向
+        for r_idx, row in enumerate(arr_rows):
+            match = CONTINUOUS_EMOJI_PATTERN.search(row)
+            if match:
+                c_idx = row[:match.start()].count(',')
+                return (r_idx, c_idx)
+        #纵向
+        for c_idx, col in enumerate(arr_cols):
+            match = CONTINUOUS_EMOJI_PATTERN.search(col)
+            if match:
+                r_idx = col[:match.start()].count(',')
+                return (r_idx, c_idx)
+
+        ## 检查某个位置非空, 在移动的前提下, 查看是否能匹配到其他物品
+        row_counts = len(arr_cells)
+        col_counts = len(arr_cells[0])
+
+        # 尝试向右移
+        for r in range(row_counts):
+            if '  ' not in arr_rows[r]:
+                continue
+            for c in range(col_counts):
+                if arr_cells[r][c] != '  ':
+                    emoji = arr_cells[r][c]
+                    remain_row = ',' + ','.join(arr_cells[r][c+1:])
+                    if '  ' not in remain_row:
+                        break
+                    # 找到右边最近的连续空格
+                    match = CONTINUOUS_EMPTY_SLOTS_PATTERN.search(remain_row)
+                    if match:
+                        near_empty_slots_count = match.group(0).count(',') # 能移动多少步
+                        for i in range(1, near_empty_slots_count+1):
+                            # 假设当前格子移到c+i位置, 检查第c+i列里是否有匹配
+                            changed_col = ','.join([emoji if k == r else arr_cells[k][c+i] for k in range(row_counts)])
+                            match = CONTINUOUS_EMOJI_PATTERN.search(changed_col)
+                            if match:
+                                return (r, c)
+
+        # 尝试向下移
+        for c in range(col_counts):
+            if '  ' not in arr_cols[c]:
+                continue
+            for r in range(row_counts):
+                if arr_cells[r][c] != '  ':
+                    emoji = arr_cells[r][c]
+                    remain_col = ',' + ','.join([arr_cells[i][c] for i in range(r+1, row_counts)])
+                    if '  ' not in remain_col:
+                        break
+                    # 找到下面最近的连续空格
+                    match = CONTINUOUS_EMPTY_SLOTS_PATTERN.search(remain_col)
+                    if match:
+                        near_empty_slots_count = match.group(0).count(',') # 能移动多少步
+                        for i in range(1, near_empty_slots_count+1):
+                            # 假设当前格子移到r+i位置, 检查第r+i行里是否有匹配
+                            changed_row = ','.join([emoji if k == c else arr_cells[r+i][k] for k in range(col_counts)])
+                            match = CONTINUOUS_EMOJI_PATTERN.search(changed_row)
+                            if match:
+                                return (r, c)
+        
+        # 尝试向左移
+        for r in range(row_counts):
+            if '  ' not in arr_rows[r]:
+                continue
+            for c in range(col_counts):
+                if arr_cells[r][c] != '  ':
+                    emoji = arr_cells[r][c]
+                    heading_row_reversed = ',' + ','.join(reversed(arr_cells[r][:c]))
+                    if '  ' not in heading_row_reversed:
+                        break
+                    # 找到左边最近的连续空格
+                    match = CONTINUOUS_EMPTY_SLOTS_PATTERN.search(heading_row_reversed)
+                    if match:
+                        near_empty_slots_count = match.group(0).count(',') # 能移动多少步
+                        for i in range(1, near_empty_slots_count+1):
+                            # 假设当前格子移到c-i位置, 检查第c-i列里是否有匹配
+                            changed_col = ','.join([emoji if k == r else arr_cells[k][c-i] for k in range(row_counts)])
+                            match = CONTINUOUS_EMOJI_PATTERN.search(changed_col)
+                            if match:
+                                return (r, c)
+
+        # 尝试向上移
+        for c in range(col_counts):
+            if '  ' not in arr_cols[c]:
+                continue
+            for r in range(row_counts):
+                if arr_cells[r][c] != '  ':
+                    emoji = arr_cells[r][c]
+                    heading_col_reversed = ',' + ','.join(reversed([arr_cells[i][c] for i in range(r)]))
+                    if '  ' not in heading_col_reversed:
+                        break
+                    # 找到下面最近的连续空格
+                    match = CONTINUOUS_EMPTY_SLOTS_PATTERN.search(heading_col_reversed)
+                    if match:
+                        near_empty_slots_count = match.group(0).count(',') # 能移动多少步
+                        for i in range(1, near_empty_slots_count+1):
+                            # 假设当前格子移到r-i位置, 检查第r-i行里是否有匹配
+                            changed_row = ','.join([emoji if k == c else arr_cells[r-i][k] for k in range(col_counts)])
+                            match = CONTINUOUS_EMOJI_PATTERN.search(changed_row)
+                            if match:
+                                return (r, c)
+        return None
+
     def play(self):
         frame_printer.clear()
         self.print_frame()
         while not self.board.all_clear():
+            if not self.board.in_move_process and not self.board.in_option_process:
+                has_match = self.check_has_move_and_can_match(str(self.board))
+                if not has_match:
+                    self.set_message('没有可移动的方块! 请考虑使用x操作, 或开始新一局')
+                    self.print_frame()
+
             cmd = self.board.get_user_input()
             if cmd == 'help':
                 self.need_help = True
-            if cmd == 'refresh':
+            elif cmd == 'refresh':
                 frame_printer.clear_cache()
                 frame_printer.clear()
-            if cmd == 'shuffle':
+            elif cmd == 'tip':
+                matching_pos = self.check_has_move_and_can_match(str(self.board))
+                if matching_pos:
+                    self.board.gems[self.board.cursor_pos[0]][self.board.cursor_pos[1]].set_select(False) # old
+                    self.board.cursor_pos = matching_pos
+                    self.board.gems[matching_pos[0]][matching_pos[1]].set_select(True) # new
+                    self.print_frame()
+            elif cmd == 'shuffle':
                 not_empty_positions = self.board.get_not_empty_slots()
                 original_size = len(not_empty_positions)
                 animation_batch = original_size//5
@@ -703,9 +835,10 @@ class Game:
                     self.board.mark_same_emoji()
             else:
                 self.board.handle_user_input(cmd)
+
             self.print_frame()
 
-        self.set_message('恭喜你，你完成了游戏！')
+        self.set_message('恭喜你，你通关了游戏！')
         self.print_frame()
 
 
@@ -724,6 +857,6 @@ if __name__ == '__main__':
             else:
                 continue
     except Exception as ex:
-        pass
+        print(ex)
     finally:
         background_sound.stop()
