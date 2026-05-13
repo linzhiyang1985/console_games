@@ -647,7 +647,7 @@ class Game:
         self.need_help = True
         
     def output_title(self):
-        return [f'{"="*21} 对对碰乐园 (第{self.game_stage}关) {"="*21}']
+        return [f'{"="*18} 对对碰乐园 (第{self.game_stage}关) {"="*18}']
 
     def output_help(self):
         return [
