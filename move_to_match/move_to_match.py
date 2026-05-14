@@ -206,20 +206,20 @@ class LoopPlayer(threading.Thread):
 frame_printer = ScreenFramePrinter()
 
 class Board:
-    ####  '🍄', '🍄‍🟫' #'🍳' #'🌹' #'🎒' #'👘'###
+    ####  '🍄', '🍄‍🟫' #'🍳' #'🌹' #'🎒' #'👘'### 🗼
     EMOJI = [
         ['🥦', '🥔', '🍄', '🌰', '🌽', '🥕'],
         ['🍎', '🍌', '🍒', '🍋', '🍊', '🍑'],
         ['🌭', '🥪', '🥨', '🍗', '🍔', '🥩'],
         ['🍧', '🍨', '🍩', '🍭', '🍰', '🍪'],
-        ['🍺', '🧋', '☕', '🥤', '🥛', '🍼'],
-        ['🫖', '🍴', '🥄', '🥢', '🫙', '🍟'],
+        ['🍺', '🧋', '🍵', '🥤', '🥛', '🍼'],
+        ['🍯', '🍹', '🥐', '🎉', '🪴', '🍟'],
         ['🌻', '🌷', '🌵', '🌸', '🍀', '🍁'],
         ['🤡', '👻' , '👹', '👺', '🐲', '🎭'],
         ['🏀', '🏐', '🏈', '🏓', '🎾', '🎿'],
-        ['💊', '💰', '🎧', '💿', '⛄', '💄'],
-        ['💻', '🎮', '🎹', '🎰', '👜', '👟'],
-        ['🐝', '🐶', '🐲', '☂️', '☔', '🌕', '🌏'],
+        ['💊', '💰', '🛬', '🎁', '🐣', '💄'],
+        ['💻', '🎨', '🎹', '💾', '👜', '👟'],
+        ['🐝', '🐶', '🐋', '🦞', '🦊', '🌕', '🌏', '🪐'],
     ]
 
     def __init__(self, difficulty_level=5):
@@ -228,6 +228,7 @@ class Board:
         self.gems = [[Gem('  ') for _ in range(self.board_width)] for _ in range(self.board_height)]
         pair_counts = ((1, 2), (3, 4), (5, 6), (7, 8), (9, 10))[difficulty_level-1]
         self.init_gems(pair_counts)
+
         self.cursor_pos = (0, 0)
         self.gems[self.cursor_pos[0]][self.cursor_pos[1]].set_select(True)
 
@@ -236,8 +237,10 @@ class Board:
 
         self.in_move_process = False
         self.in_option_process = False
-        self.original_direction = None
-        self.original_block_positions = []
+        self.prev_direction = None
+
+        self.moving_block_positions = []
+        self.original_cursor_pos = None
         self.prev_block_positions = []
 
         self.matching_pos_list = []
@@ -448,29 +451,43 @@ class Board:
                 else:
                     break
                 r, c = next_block
-        return moving_blocks
+        return sorted(moving_blocks) # sort之后, 水平方向上总是左到右排列, 垂直方向上总是上到下排列
 
     def reset_blocks_to_original(self):
-        if self.prev_block_positions and self.original_block_positions and self.prev_block_positions != self.original_block_positions:
+        if self.prev_block_positions and self.moving_block_positions and self.prev_block_positions != self.moving_block_positions:
             for index, (r, c) in enumerate(self.prev_block_positions):
-                o_r, o_c = self.original_block_positions[index]
+                o_r, o_c = self.moving_block_positions[index]
                 self.gems[o_r][o_c] = self.gems[r][c]
-                self.gems[r][c] = Gem()
-            self.cursor_pos = self.original_block_positions[0]
+                if (r, c) not in self.moving_block_positions:
+                    self.gems[r][c] = Gem()
+            self.cursor_pos = self.original_cursor_pos
             self.play_reset()
 
-    def move_blocks(self, next_pos):
+    def move_blocks(self, next_pos, head_or_tail='head'):
         if self.valid_position(*next_pos) and self.is_empty(*next_pos):
-            self.prev_block_positions.append(next_pos)
-            # 最尾一块的左方有空位, 说明可以移动
-            for index in range(len(self.prev_block_positions) - 1, -1, -1):
-                if index == 0:
-                    self.gems[self.prev_block_positions[index][0]][self.prev_block_positions[index][1]] = Gem()
-                else:
-                    self.gems[self.prev_block_positions[index][0]][self.prev_block_positions[index][1]] = self.gems[self.prev_block_positions[index-1][0]][self.prev_block_positions[index-1][1]]
-            self.prev_block_positions.pop(0)
-            self.cursor_pos = self.prev_block_positions[0]
+            if head_or_tail == 'head':
+                new_block_positions = [next_pos] + self.prev_block_positions[:]
+                new_block_positions.pop(-1)
+            else:
+                new_block_positions = self.prev_block_positions + [next_pos]
+                new_block_positions.pop(0)
+            # 移动块, 要从next_pos一端开始移
+            for i in (range(len(new_block_positions)) if head_or_tail == 'head' else range(len(new_block_positions)-1, -1, -1)):
+                n_r, n_c = new_block_positions[i]
+                o_r, o_c = self.prev_block_positions[i]
+                self.gems[n_r][n_c] = self.gems[o_r][o_c]
+            # 清除空出来的一块
+            if head_or_tail == 'head':
+                clear_r, clear_c = self.prev_block_positions[-1]
+            else:
+                clear_r, clear_c = self.prev_block_positions[0]
+            self.gems[clear_r][clear_c] = Gem()
+            # 更新位置
+            self.prev_block_positions = new_block_positions
+            
             self.play_drag()
+            return True
+        return False
 
     def find_matching_positions(self):
         # 检查是否有跟当前块匹配的块
@@ -531,8 +548,8 @@ class Board:
         r2, c2 = gem_pos2
         self.gems[r1][c1], self.gems[r2][c2] = self.gems[r2][c2], self.gems[r1][c1]
     
-    def shuffle_gems(self, not_empty_positions, stop_at_size=1):
-        while len(not_empty_positions) > max(stop_at_size, 1):
+    def shuffle_gems(self, not_empty_positions, stop_at_size=2):
+        while len(not_empty_positions) > max(stop_at_size, 2):
             index1 = random.randint(0, len(not_empty_positions) - 1)
             index2 = random.randint(0, len(not_empty_positions) - 1)
             if index1 != index2:
@@ -569,25 +586,33 @@ class Board:
         elif cmd in ('up', 'down', 'left', 'right'):
             if self.in_move_process:
                 ### 移动关联块 ###
-                if self.original_direction is None:
+                if self.prev_direction is None:
                     # 第一次移动，记录下移动方向
-                    self.original_direction = cmd
-                    self.original_block_positions = self.find_moving_block(cmd) #方向确定了, 更新该方向上连接的其他块
-                    self.prev_block_positions = list(self.original_block_positions)
+                    self.prev_direction = cmd
+                    self.moving_block_positions = self.find_moving_block(cmd) #方向确定了, 更新该方向上连接的其他块
+                    self.original_cursor_pos = self.cursor_pos # 记录下原始光标位置
+                    self.prev_block_positions = list(self.moving_block_positions)
                 else:
-                    if self.original_direction != cmd and self.original_direction != self.opposite_direction[cmd]:
+                    if self.prev_direction != cmd and self.prev_direction != self.opposite_direction[cmd]:
                         return # 移动方向不能改变, 只能继续前进或回退
                 # 操作移动关联的块
                 if self.prev_block_positions:
                     if cmd == 'left':
-                        next_pos = (self.prev_block_positions[-1][0], self.prev_block_positions[-1][1] - 1) # 最后一块的左方
+                        next_pos = (self.prev_block_positions[0][0], min([p[1] for p in self.prev_block_positions]) - 1) # 最左边一块的左方
+                        if self.move_blocks(next_pos, head_or_tail='head'):
+                            self.cursor_move_left()
                     elif cmd == 'right':
-                        next_pos = (self.prev_block_positions[-1][0], self.prev_block_positions[-1][1] + 1) # 最后一块的右方
+                        next_pos = (self.prev_block_positions[0][0], max([p[1] for p in self.prev_block_positions]) + 1) # 最右边一块的右方
+                        if self.move_blocks(next_pos, head_or_tail='tail'):
+                            self.cursor_move_right()
                     elif cmd == 'up':
-                        next_pos = (self.prev_block_positions[-1][0] - 1, self.prev_block_positions[-1][1]) # 最后一块的上方
+                        next_pos = (min([p[0] for p in self.prev_block_positions]) - 1, self.prev_block_positions[0][1]) # 最上边一块的上方
+                        if self.move_blocks(next_pos, head_or_tail='head'):
+                            self.cursor_move_up()
                     elif cmd == 'down':
-                        next_pos = (self.prev_block_positions[-1][0] + 1, self.prev_block_positions[-1][1]) # 最后一块的下方
-                    self.move_blocks(next_pos)
+                        next_pos = (max([p[0] for p in self.prev_block_positions]) + 1, self.prev_block_positions[0][1]) # 最下边一块的下方
+                        if self.move_blocks(next_pos, head_or_tail='tail'):
+                            self.cursor_move_down()
             elif self.in_option_process:
                 option_gem_pos = self.matching_pos_list[self.option_index]
                 if cmd in ('left', 'down'):
@@ -617,7 +642,7 @@ class Board:
             self.matching_pos_list = [] # 清空匹配块的位置
         elif cmd == 'move_start':
             self.in_move_process = True
-            self.original_block_positions = self.find_moving_block(None) #方向还没确定,只能记录当前位置的块
+            self.moving_block_positions = self.find_moving_block(None) #方向还没确定,只能记录当前位置的块
         elif cmd == 'move_end':
             matching_pos_list = self.find_matching_positions()
             if not matching_pos_list:
@@ -633,8 +658,8 @@ class Board:
                     self.clear_gems(*matching_pos_list, self.cursor_pos)
             # 重置标记
             self.in_move_process = False
-            self.original_direction = None # 重置移动方向
-            self.original_block_positions = [] # 清空移动块的位置
+            self.prev_direction = None # 重置移动方向
+            self.moving_block_positions = [] # 清空移动块的位置
             self.prev_block_positions = [] # 清空上一次移动块的位置
         elif cmd == 'quit':
             sys.exit()
@@ -822,7 +847,7 @@ class Game:
             elif cmd == 'shuffle':
                 not_empty_positions = self.board.get_not_empty_slots()
                 original_size = len(not_empty_positions)
-                animation_batch = original_size//5
+                animation_batch = original_size//min(5, original_size)
                 next_stop_point = original_size - animation_batch
                 self.board.play_shuffle()
                 self.board.clear_same_emoji()
@@ -841,6 +866,15 @@ class Game:
         self.set_message('恭喜你，你通关了游戏！')
         self.print_frame()
 
+def validate_emoji():
+    for row in Board.EMOJI:
+        for emoji in row:
+            try:
+                unicode = ord(emoji)
+                print(f'emoji {emoji} unicode: {unicode}({hex(unicode)}){", but within exclude range" if unicode<0x4dff else ""}')
+            except:
+                print(f'emoji {emoji} is not one byte')
+# validate_emoji() # run one time after changing EMOJI list
 
 if __name__ == '__main__':
     try:
