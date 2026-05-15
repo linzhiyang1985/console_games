@@ -455,9 +455,15 @@ class Board:
 
     def reset_blocks_to_original(self):
         if self.prev_block_positions and self.moving_block_positions and self.prev_block_positions != self.moving_block_positions:
-            for index, (r, c) in enumerate(self.prev_block_positions):
-                o_r, o_c = self.moving_block_positions[index]
-                self.gems[o_r][o_c] = self.gems[r][c]
+            emoji_chars = [self.gems[r][c].emoji for r, c in self.prev_block_positions]
+            for index, (r, c) in enumerate(self.moving_block_positions):
+                self.gems[r][c].emoji = emoji_chars[index]
+                if (r, c) == self.original_cursor_pos:
+                    self.gems[r][c].set_select(True)
+                else:
+                    self.gems[r][c].set_select(False)
+            # 清除新空出来的区域
+            for r, c in self.prev_block_positions:
                 if (r, c) not in self.moving_block_positions:
                     self.gems[r][c] = Gem()
             self.cursor_pos = self.original_cursor_pos
