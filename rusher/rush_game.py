@@ -182,7 +182,7 @@ class RushGame:
             self.set_string(y + i, x, line)
         self.set_string(y + i + 1, x, last_2_line_changes[self.runner_last_line_index][0])
         self.set_string(y + i + 2, x, last_2_line_changes[self.runner_last_line_index][1])
-        if not self.game_over:
+        if not self.game_over and not self.paused:
             self.runner_last_line_index = (self.runner_last_line_index + 1) % len(last_2_line_changes)
     
     def update_runner(self):
