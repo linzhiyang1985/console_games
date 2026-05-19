@@ -324,7 +324,7 @@ class RushGame:
     
     def draw_border(self):
         self.set_string(2, 0, '+' + '-' * (self.screen_width - 2) + '+')
-        for y in range(2, self.screen_height - 2):
+        for y in range(3, self.screen_height - 2):
             self.set_char(y, 0, '|')
             self.set_char(y, self.screen_width - 1, '|')
         self.set_string(self.screen_height - 2, 0, '+' + '-' * (self.screen_width - 2) + '+')
