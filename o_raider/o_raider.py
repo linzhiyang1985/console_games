@@ -130,8 +130,10 @@ class Game:
         self.WIDTH = 40
         self.HEIGHT = 20
         self.player = {'x': self.WIDTH // 2, 'y': self.HEIGHT - 2}
+        self.move_speed = 1
         self.bullets = []
         self.obstacles = []
+        self.auto_shoot = False
         self.powerups = []
         self.score = 0
         self.kill_count = 0
@@ -143,7 +145,7 @@ class Game:
         self.game_over = False
         
     def spawn_obstacle(self):
-        types = [('A', 1), ('B', 1), ('C', 3), ('D', 2)]
+        types = [('A', 1), ('B', 2), ('C', 3), ('D', 2)]
         obstacle_type, health = random.choice(types)
         return {
             'x': random.randint(1, self.WIDTH - 2),
@@ -177,13 +179,17 @@ class Game:
         if now - self.last_shot_time >= self.shot_interval / self.bullet_speed:
             self.play_shoot()
             for i in range(-self.spread_width, self.spread_width + 1):
-                self.bullets.append({'x': self.player['x'] + i, 'y': self.player['y'] - 1, 'dx': i * 0.3, 'dy': -1})
+                self.bullets.append({'x': self.player['x'] + i, 'y': self.player['y'] - 1, 'dx': i * (1/self.spread_width*2 if self.spread_width > 0 else 0), 'dy': -1})
             self.last_shot_time = now
             
     def move_player(self, dx):
         new_x = self.player['x'] + dx
         if 1 <= new_x < self.WIDTH - 1:
             self.player['x'] = new_x
+        elif new_x  < 1:
+            self.player['x'] = 1
+        else:
+            self.player['x'] = self.WIDTH - 2
         
     def update(self):
         if random.random() < 0.03:
@@ -225,6 +231,14 @@ class Game:
                     if obstacle['health'] <= 0:
                         self.score += 10
                         self.kill_count += 1
+                        
+                        ### upgrade ###
+                        if self.kill_count % 20 == 0:
+                            self.bullet_speed += 1
+                        
+                        if self.kill_count % 40 == 0:
+                            self.move_speed += 1
+                        ####
                         to_remove.append(i)
                         self.play_explode()
                     break
@@ -249,16 +263,13 @@ class Game:
         
         for i in reversed(to_remove_powerup):
             del self.powerups[i]
-        
-        if self.kill_count > 0 and self.kill_count % 20 == 0:
-            self.bullet_speed += 1
     
     def get_status_rows(self):
         rows = []
         rows.append(f'击落:{self.kill_count} 得分:{self.score}')
-        rows.append(f'威力:{self.bullet_power} 射速: x{self.bullet_speed} 散射宽度:{self.spread_width}')
-        rows.append('使用 ← → 或 A D 移动，空格键射击，ESC退出')
-        rows.append('障碍物: A(1弹), B(1弹), C(3弹), D(2弹,移动)')
+        rows.append(f'移动速度:{self.move_speed} 威力:{self.bullet_power} 射速:x{self.bullet_speed} 散射宽度:{self.spread_width}')
+        rows.append('使用 ← → 或 A D 移动，空格键射击(T自动射击)，ESC退出')
+        rows.append('障碍物: A(1弹), B(2弹), C(3弹), D(2弹,移动)')
         rows.append('奖励: *(威力+1) #(散射)')
         return rows
     
@@ -306,22 +317,26 @@ class Game:
             key = ord(msvcrt.getch())
             if key == 27: # ESC
                 self.game_over = True
-            elif key == 32: # 空格
+            elif key == 116 or key == 84: # t 或 T
+                self.auto_shoot = not self.auto_shoot
+            elif not self.auto_shoot and key == 32: # 空格
                 self.shoot()
             elif key == 224: # 方向键
                 arrow_key = ord(msvcrt.getch())
                 if arrow_key == 75: # 左
-                    self.move_player(-1)
+                    self.move_player(-1 * self.move_speed)
                 elif arrow_key == 77: # 右
-                    self.move_player(1)
+                    self.move_player(1 * self.move_speed)
             elif key == 97 or key == 65: # a 或 A
-                self.move_player(-1)
+                self.move_player(-1 * self.move_speed)
             elif key == 100 or key == 68: # d 或 D
-                self.move_player(1)
+                self.move_player(1 * self.move_speed)
         
     def run(self):
         frame_printer.clear()
         while not self.game_over:
+            if self.auto_shoot:
+                self.shoot()
             self.handle_input()
             self.update()
             frame = self.output_frame()
