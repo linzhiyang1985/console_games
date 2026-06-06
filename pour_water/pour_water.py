@@ -406,7 +406,7 @@ class PourWater:
     def print_frame(self, messages=[]):
         rows = self.output()
         if self.need_help:
-            rows.append('A: Help, arrow: Move, N: New Bottle, D/Enter: Pour, R: Refresh')
+            rows.append('A: Help, arrows: Move, N: New Bottle, D/Enter: Select/Pour, R: Refresh, Q: Quit')
             self.need_help = False
         rows.extend(messages)
         frame_printer.print_frame(rows)
