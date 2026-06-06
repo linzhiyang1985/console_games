@@ -6,7 +6,7 @@ import msvcrt
 import time
 import threading
 import random
-from turtle import back
+import sys
 from playsound3 import playsound
 
 
@@ -194,6 +194,7 @@ class PourWater:
         self.bottle_deck:list[Bottle] = []
         self.bottle_count = 3 + level
         self.init_bottles(self.bottle_count) # 最少三个瓶子
+        self.BOTTLES_PER_ROW = max(4, (self.bottle_count + 2)//5)
         self.cursor_index = 0
         self.pour_from_index = -1
         self.pour_to_index = -1
@@ -320,7 +321,7 @@ class PourWater:
         # new_index = (self.cursor_index + self.BOTTLES_PER_ROW)//self.BOTTLES_PER_ROW * self.BOTTLES_PER_ROW
         new_index = self.cursor_index + self.BOTTLES_PER_ROW
         if new_index >= len(self.bottle_deck):
-            new_index = new_index % self.BOTTLES_PER_ROW
+            new_index = len(self.bottle_deck) - 1
         self.cursor_index = new_index
 
         self.bottle_deck[old_index].set_focus(False)
@@ -353,6 +354,7 @@ class PourWater:
             b'H': 'prev_array', b'P': 'next_array',
             b'K': 'prev', b'M': 'next',
             b'q': 'quit', b'Q': 'quit',
+            b'r': 'refresh', b'R': 'refresh',
             b'a': 'help', b'A': 'help',
             b'n': 'new_bottle', b'N': 'new_bottle',
             b'\r': 'enter', b'd': 'enter', b'D': 'enter',
@@ -372,6 +374,9 @@ class PourWater:
             exit(0)
         elif cmd == 'help':
             self.need_help = True
+        elif cmd == 'refresh':
+            frame_printer.clear_cache()
+            frame_printer.clear()
         elif cmd == 'prev':
             self.cursor_move_prev()
         elif cmd == 'next':
@@ -401,7 +406,7 @@ class PourWater:
     def print_frame(self, messages=[]):
         rows = self.output()
         if self.need_help:
-            rows.append('A: Help, arrow: Move, N: New Bottle, D/Enter: Pour')
+            rows.append('A: Help, arrow: Move, N: New Bottle, D/Enter: Pour, R: Refresh')
             self.need_help = False
         rows.extend(messages)
         frame_printer.print_frame(rows)
@@ -427,12 +432,16 @@ class PourWater:
 
 if __name__ == '__main__':
     try:
+        start_level = int(sys.argv[1])
+    except:
+        start_level = 0
+    try:
         background_sound = LoopPlayer()
         background_sound.start()
 
-        for level in range(10):
-            # for _ in range(5):
-                # 每个level玩5局
+        for level in range(start_level,98):
+            # for _ in range(3):
+                # 每个level玩3局
                 frame_printer.clear_cache()
                 pw = PourWater(level)
                 pw.play()
