@@ -155,16 +155,16 @@ class Bottle:
 
     def output_bottle(self):
         bottle_cover = [
-            " ╭─────╮ ",
-            "╭╯     ╰╮",
+            " ╭───╮ ",
+            "╭╯   ╰╮",
         ]
-        bottle_water = "░░░░░░░"
-        bottle_empty = "       "
-        bottle_bottom = "╰───────╯"
+        bottle_water = "░░░░░"
+        bottle_empty = "     "
+        bottle_bottom = "╰─────╯"
         
         rows = bottle_cover[:]
         if self.is_sealed:
-            rows[1] = f"╭╯{Color.BRIGHT_BLACK_FG+'█'*5+Color.RESET_FG}╰╮"
+            rows[1] = f"╭╯{Color.BRIGHT_BLACK_FG+'█'*3+Color.RESET_FG}╰╮"
         for drop in reversed(self.drops):
             if drop:
                 rows.append(f'│{drop + bottle_water + Color.RESET_FG}│')
