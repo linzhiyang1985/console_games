@@ -142,12 +142,15 @@ class Board:
             row.append(0)
         self.board.insert(0, [0] * (board_size + 2))
         self.board.append([0] * (board_size + 2))
+
+        self.head_position_and_direction.clear()
+
         for worm in self.worms:
             r, c = worm.head_position
             worm.head_position = (r + 1, c + 1)
+            self.head_position_and_direction[worm.head_position] = worm.direction
 
     def check_conflict(self, head_position, direction):
-        opposit_direction_map = {Direction.UP: Direction.DOWN, Direction.DOWN: Direction.UP, Direction.LEFT: Direction.RIGHT, Direction.RIGHT: Direction.LEFT}
         if direction == Direction.UP:
             r, c = head_position
             for check_r in range(r - 1, -1, -1):
@@ -371,7 +374,7 @@ class Game:
             self.refresh_screen()
 
 if __name__ == '__main__':
-    for i in range(4, 60):  
+    for i in range(4, 600):  
         game = Game(i)
         game.refresh_screen()
         game.play()
