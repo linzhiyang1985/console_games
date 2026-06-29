@@ -253,30 +253,25 @@ class Board:
                 worm.head_position = (head_r - 1, head_c)
             elif head_r == 0:
                 worm.size -=1
-                if worm.size == 0:
-                    self.worms.remove(worm)
         elif worm.direction == Direction.DOWN:
             if head_r < board_size - 1 and self.board[head_r + 1][head_c] == 0:
                 worm.head_position = (head_r + 1, head_c)
             elif head_r == board_size - 1:
                 worm.size -=1
-                if worm.size == 0:
-                    self.worms.remove(worm)
-                    self.select_next_worm()
         elif worm.direction == Direction.LEFT:
             if head_c > 0 and self.board[head_r][head_c - 1] == 0:
                 worm.head_position = (head_r, head_c - 1)
             elif head_c == 0:
                 worm.size -=1
-                if worm.size == 0:
-                    self.worms.remove(worm)
         elif worm.direction == Direction.RIGHT:
             if head_c < board_size - 1 and self.board[head_r][head_c + 1] == 0:
                 worm.head_position = (head_r, head_c + 1)
             elif head_c == board_size - 1:
                 worm.size -=1
-                if worm.size == 0:
-                    self.worms.remove(worm)
+        
+        if worm.size == 0:
+            self.worms.remove(worm)
+            self.select_next_worm()
         
         new_positions = worm.get_positions()
         if new_positions == original_positions:
@@ -364,6 +359,7 @@ class Game:
                 if len(self.board.worms) == 0:
                     self.refresh_screen()
                     print('You win!')
+                    input('Press <Enter> to continue...')
                     break
             elif command == 'prev_worm':
                 self.select_prev_worm()
