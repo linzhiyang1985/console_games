@@ -416,7 +416,11 @@ if __name__ == '__main__':
     try:
         background_sound = LoopPlayer()
         background_sound.start()
-        for i in range(4, 600):
+        if len(sys.argv) > 1:
+            start_count = int(sys.argv[1])
+        else:
+            start_count = 4
+        for i in range(start_count, 600):
             game = Game(i)
             game.refresh_screen()
             game.play()
